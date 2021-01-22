@@ -6,6 +6,10 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "list.h"
+#include "datatypes.h"
+#include "stack.h"
+#include "conversion.h"
+#include "var.h"
 
 typedef enum {
 	BC_PUSHSTR,
@@ -40,27 +44,6 @@ typedef struct _OP {
 	int left;
 	int right;
 } OP;
-
-typedef enum {
-	DATA_STRING,
-	DATA_NUMBER,
-	DATA_VOID
-} DataType;
-
-typedef struct _StackRow {
-	ListNode node;
-	DataType type;
-	int data_number;
-	char *data_string;
-} StackRow;
-
-typedef struct _VarList {
-	ListNode node;
-	DataType type;
-	char *name;
-	int data_number;
-	char *data_string;
-} VarList;
 
 char *strmalloc (const char *s) {
   size_t len = strlen (s) + 1;

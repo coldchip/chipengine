@@ -14,6 +14,11 @@ int main(int argc, char const *argv[]) {
 	return 0;
 }
 
+void runtime_error(const char* data) {
+	printf("%s\n", data);
+	exit(1);
+}
+
 void load_binary() {
 	FILE *fp = fopen("/home/ryan/compiler/data/out.bin", "rb");
 	if(fp == NULL) {
@@ -104,16 +109,6 @@ int get_char_from_constant_list(char *data) {
 	return -1;
 }
 
-VarList *get_var(List *list, char *name) {
-	for(ListNode *i = list_begin(list); i != list_end(list); i = list_next(i)) {
-		VarList *row = (VarList*)i;
-		if(strcmp(row->name, name) == 0) {
-			return row;
-		}
-	}
-	return NULL;
-}
-
 Function *get_function(unsigned index) {
 	for(ListNode *i = list_begin(&functions); i != list_end(&functions); i = list_next(i)) {
 		Function *row = (Function*)i;
@@ -162,27 +157,27 @@ void run_binary(int index) {
 		int right = row->right;
 		switch(op) {
 			case BC_PUSH: {
-				StackRow *row = malloc(sizeof(StackRow));
-				row->type = DATA_NUMBER;
-				row->data_number = left;
-				list_insert(list_end(&stack), row);
+				StackRow *stack_obj = new_number_stack_object(left);
+				list_insert(list_end(&stack), stack_obj);
 				printf("push %i\n", left);
+			}
+			break;
+			case BC_PUSHSTR: {
+				char *string = get_from_constant_list(left);
+				StackRow *stack_obj = new_string_stack_object(string);
+				list_insert(list_end(&stack), stack_obj);
+				printf("pushstr %s\n", string);
 			}
 			break;
 			case BC_STORE: {
 				StackRow *pop = (StackRow*)list_remove(list_back(&stack));
 				
-				VarList *var = get_var(&varlist, get_from_constant_list(left));
-				if(var) {
-					var->data_number = pop->data_number;
-				} else {
-					VarList *row = malloc(sizeof(VarList));
-					row->type = DATA_NUMBER;
-					row->name = get_from_constant_list(left);
-					row->data_number = pop->data_number;
-					list_insert(list_end(&varlist), row);
-					printf("store %s\n", get_from_constant_list(left));
-				}
+				char *var_name = get_from_constant_list(left);
+
+				VarList *var = varobject_from_stackobject(pop, var_name);
+				list_insert(list_end(&varlist), var);
+				printf("store %s\n", var_name);
+				
 				free(pop);
 			}
 			break;
@@ -198,55 +193,57 @@ void run_binary(int index) {
 					exit(1);
 				}
 
-				StackRow *row = malloc(sizeof(StackRow));
-				row->type = DATA_NUMBER;
-				row->data_number = var->data_number;
+				StackRow *row = stackobject_from_varobject(var);
 				list_insert(list_end(&stack), row);
 
 				printf("load %s\n", var->name);
 			}
 			break;
+			case BC_STRCONCAT: {
+				// mem issue
+				StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
+				StackRow *back = (StackRow*)list_back(&stack);
+				char *concat = malloc(sizeof(char) * (strlen(pop->data_string) + strlen(pop->data_string) + 1));
+				strcpy(concat, pop->data_string);
+				strcat(concat, back->data_string);
+				back->data_string = concat;
+				printf("strconcat\n");
+				free(pop);
+			}
+			break;
 			case BC_ADD: {
 				StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
-				StackRow *pop1 = (StackRow*)list_remove(list_back(&stack));
-				
-				StackRow *new = malloc(sizeof(StackRow));
-				new->type = DATA_NUMBER;
-				new->data_number = pop->data_number + pop1->data_number;
-				list_insert(list_end(&stack), new);
+				StackRow *back = (StackRow*)list_back(&stack);
+				back->data_number += pop->data_number;
+
+				free(pop);
 				printf("add\n");
 			}
 			break;
 			case BC_SUB: {
 				StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
-				StackRow *pop1 = (StackRow*)list_remove(list_back(&stack));
-				
-				StackRow *new = malloc(sizeof(StackRow));
-				new->type = DATA_NUMBER;
-				new->data_number = pop->data_number - pop1->data_number;
-				list_insert(list_end(&stack), new);
+				StackRow *back = (StackRow*)list_back(&stack);
+				back->data_number -= pop->data_number;
+
+				free(pop);
 				printf("sub\n");
 			}
 			break;
 			case BC_MUL: {
 				StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
-				StackRow *pop1 = (StackRow*)list_remove(list_back(&stack));
-				
-				StackRow *new = malloc(sizeof(StackRow));
-				new->type = DATA_NUMBER;
-				new->data_number = pop->data_number * pop1->data_number;
-				list_insert(list_end(&stack), new);
+				StackRow *back = (StackRow*)list_back(&stack);
+				back->data_number *= pop->data_number;
+
+				free(pop);
 				printf("mul\n");
 			}
 			break;
 			case BC_DIV: {
 				StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
-				StackRow *pop1 = (StackRow*)list_remove(list_back(&stack));
-				
-				StackRow *new = malloc(sizeof(StackRow));
-				new->type = DATA_NUMBER;
-				new->data_number = pop->data_number / pop1->data_number;
-				list_insert(list_end(&stack), new);
+				StackRow *back = (StackRow*)list_back(&stack);
+				back->data_number /= pop->data_number;
+
+				free(pop);
 				printf("div\n");
 			}
 			break;
@@ -268,7 +265,11 @@ void run_binary(int index) {
 				if(strcmp(name, "printf") == 0) {
 					StackRow *count  = (StackRow*)list_remove(list_back(&stack));
 					StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
-					printf("--print %i\n", pop->data_number);
+					if(pop->type == DATA_STRING) {
+						printf("--print %s\n", pop->data_string);
+					} else {
+						printf("--print %i\n", pop->data_number);
+					}
 				} else if(strcmp(name, "dbgstack") == 0) {
 					for(ListNode *i = list_begin(&stack); i != list_end(&stack); i = list_next(i)) {
 						StackRow *row = (StackRow*)i;

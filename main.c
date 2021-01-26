@@ -41,7 +41,7 @@ int main(int argc, char const *argv[]) {
 void load_binary() {
 	FILE *fp = fopen("/home/ryan/compiler/data/out.bin", "rb");
 	if(fp == NULL) {
-		printf("Unable to load\n");
+		debug_log("Unable to load\n");
 		exit(1);
 	}
 
@@ -61,8 +61,8 @@ void load_binary() {
 		fread(&f_index, sizeof(unsigned), 1, fp);
 		fread(&code_count, sizeof(unsigned), 1, fp);
 
-		printf("Code Count: %i\n", code_count);
-		printf("---------------\n");
+		debug_log("Code Count: %i\n", code_count);
+		debug_log("---------------\n");
 
 		Function *function = malloc(sizeof(Function));
 		list_clear(&function->code);
@@ -83,15 +83,15 @@ void load_binary() {
 			row->right = right;
 
 			list_insert(list_end(&function->code), row);
-			printf("%i %i %i\n", op, left, right);
+			debug_log("%i %i %i\n", op, left, right);
 		}
 		list_insert(list_end(&functions), function);
 	}
-	printf("\n\n");
+	debug_log("\n\n");
 	unsigned constant_count = 0;
 	fread(&constant_count, sizeof(unsigned), 1, fp);
-	printf("Constant Count: %i\n", constant_count);
-	printf("---------------\n");
+	debug_log("Constant Count: %i\n", constant_count);
+	debug_log("---------------\n");
 	for(unsigned i = 0; i < constant_count; i++) {
 		unsigned str_len = 0;
 		fread(&str_len, sizeof(unsigned), 1, fp);
@@ -102,10 +102,21 @@ void load_binary() {
 		row->index = i;
 		row->data = data;
 		list_insert(list_end(&constants), row);
-		printf("Index: %i, Data: %s\n", i, data);
+		debug_log("Index: %i, Data: %s\n", i, data);
 	}
 	
 	fclose(fp);
+}
+
+void debug_log(const char *format, ...) {
+	va_list args;
+	va_start(args, format);
+
+	if(1 == 2) {
+		vprintf(format, args);
+	}
+
+    va_end(args);
 }
 
 char *get_from_constant_list(int in) {
@@ -154,8 +165,7 @@ OP *get_op_by_index(List *code, unsigned index) {
 void run_binary(int index) {
 	Function *function = get_function(index);
 	if(!function) {
-		printf("Function %i not found\n", index);
-		exit(1);
+		runtime_error("Function %i not found\n", index);
 	}
 
 	List stack;
@@ -178,14 +188,14 @@ void run_binary(int index) {
 			case BC_PUSH: {
 				StackRow *stack_obj = new_number_stack_object(left);
 				list_insert(list_end(&stack), stack_obj);
-				printf("push %i\n", left);
+				debug_log("push %i\n", left);
 			}
 			break;
 			case BC_PUSHSTR: {
 				char *string = get_from_constant_list(left);
 				StackRow *stack_obj = new_string_stack_object(string);
 				list_insert(list_end(&stack), stack_obj);
-				printf("pushstr %s\n", string);
+				debug_log("pushstr %s\n", string);
 			}
 			break;
 			case BC_STORE: {
@@ -195,7 +205,7 @@ void run_binary(int index) {
 
 				VarList *var = varobject_from_stackobject(pop, name);
 				put_var(&varlist, var);
-				printf("store %s\n", name);
+				debug_log("store %s\n", name);
 				
 				free_stack(pop);
 			}
@@ -203,19 +213,17 @@ void run_binary(int index) {
 			case BC_LOAD: {
 				char *name = get_from_constant_list(left);
 				if(!name) {
-					printf("Load failed\n");
-					exit(1);
+					runtime_error("Load failed\n");
 				}
 				VarList *var = get_var(&varlist, name);
 				if(!var) {
-					printf("Load var failed\n");
-					exit(1);
+					runtime_error("Load var failed\n");
 				}
 
 				StackRow *row = stackobject_from_varobject(var);
 				list_insert(list_end(&stack), row);
 
-				printf("load %s\n", var->name);
+				debug_log("load %s\n", var->name);
 			}
 			break;
 			case BC_STRCONCAT: {
@@ -227,7 +235,7 @@ void run_binary(int index) {
 				strcat(concat, back->data_string);
 				free(back->data_string);
 				back->data_string = concat;
-				printf("strconcat\n");
+				debug_log("strconcat\n");
 				free_stack(pop);
 			}
 			break;
@@ -237,7 +245,7 @@ void run_binary(int index) {
 				back->data_number += pop->data_number;
 
 				free_stack(pop);
-				printf("add\n");
+				debug_log("add\n");
 			}
 			break;
 			case BC_SUB: {
@@ -246,7 +254,7 @@ void run_binary(int index) {
 				back->data_number -= pop->data_number;
 
 				free_stack(pop);
-				printf("sub\n");
+				debug_log("sub\n");
 			}
 			break;
 			case BC_MUL: {
@@ -255,7 +263,7 @@ void run_binary(int index) {
 				back->data_number *= pop->data_number;
 
 				free_stack(pop);
-				printf("mul\n");
+				debug_log("mul\n");
 			}
 			break;
 			case BC_DIV: {
@@ -264,7 +272,7 @@ void run_binary(int index) {
 				back->data_number /= pop->data_number;
 
 				free_stack(pop);
-				printf("div\n");
+				debug_log("div\n");
 			}
 			break;
 			case BC_CMPGT: {
@@ -283,7 +291,7 @@ void run_binary(int index) {
 				}
 				free_stack(pop);
 				free_stack(pop2);
-				printf("cmpgt\n");
+				debug_log("cmpgt\n");
 			}
 			break;
 			case BC_CMPLT: {
@@ -302,7 +310,7 @@ void run_binary(int index) {
 				}
 				free_stack(pop);
 				free_stack(pop2);
-				printf("cmplt\n");
+				debug_log("cmplt\n");
 			}
 			break;
 			case BC_JMPIFEQ: {
@@ -317,32 +325,32 @@ void run_binary(int index) {
 				}
 				free_stack(pop);
 				free_stack(pop2);
-				printf("jmpifeq\n");
+				debug_log("jmpifeq\n");
 			}
 			break;
 			case BC_RET: {
 				StackRow *pop = (StackRow*)list_remove(list_back(&stack));
 				list_insert(list_end(&transfer), pop);
-				printf("ret\n");
+				debug_log("ret\n");
 				goto release;
 			}
 			break;
 			case BC_GOTO: {
 				i = (ListNode*)get_op_by_index(&function->code, left-1);
-				printf("goto\n");
+				debug_log("goto\n");
 			}
 			break;
 			case BC_CALL: {
 				char *name = get_from_constant_list(left);
-				printf("call\n");
+				debug_log("call %s\n", name);
 				if(name) {
 					StackRow *count = (StackRow*)list_remove(list_back(&stack));
 					if(strcmp(name, "printf") == 0) {
 						StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
 						if(pop->type == DATA_STRING) {
-							printf("--print %s\n", pop->data_string);
+							printf("%s\n", pop->data_string);
 						} else {
-							printf("--print %i\n", pop->data_number);
+							printf("%i\n", pop->data_number);
 						}
 						free_stack(pop);
 					} else if(strcmp(name, "dbgstack") == 0) {
@@ -359,9 +367,32 @@ void run_binary(int index) {
 							printf("%s data_int %i\n", row->name, row->data_number);
 							printf("----------\n");
 						}
+					} else if(strcmp(name, "__callinternal__strlen") == 0) {
+						StackRow *str = (StackRow*)list_remove(list_back(&stack));
+						if(str->type == DATA_STRING) {
+							int str_len = strlen(str->data_string);
+							StackRow *res = new_number_stack_object(str_len);
+							list_insert(list_end(&transfer), res);
+							goto release;
+						} else {
+							runtime_error("invalid type passed to __callinternal__strlen");
+						}
+					} else if(strcmp(name, "__callinternal__charat") == 0) {
+						StackRow *index = (StackRow*)list_remove(list_back(&stack));
+						StackRow *str = (StackRow*)list_remove(list_back(&stack));
+						if(str->type == DATA_STRING && index->type == DATA_NUMBER) {
+							char strat[2];
+							strat[1] = '\0';
+							strat[0] = *(str->data_string + index->data_number);
+							StackRow *res = new_string_stack_object(strat);
+							list_insert(list_end(&transfer), res);
+							goto release;
+						} else {
+							runtime_error("invalid type passed to __callinternal__charat");
+						}
 					} else {
 						if(count && count->type != DATA_NUMBER) {
-							printf("Opps, unable to figure number of args to pass to stack\n");
+							runtime_error("Opps, unable to figure number of args to pass to stack\n");
 						}
 						for(int s = 0; s < count->data_number; s++) {
 							StackRow *pop = (StackRow*)list_remove(list_back(&stack));
@@ -377,7 +408,7 @@ void run_binary(int index) {
 					}
 					free_stack(count);
 				} else {
-					printf("UNable to call\n");
+					runtime_error("Unable get function name from constant list");
 				}
 
 			}

@@ -10,7 +10,12 @@ char *strmalloc(char *s) {
 	return new_s;
 }
 
-void runtime_error(const char* data) {
-	printf("%s\n", data);
-	exit(1);
+void runtime_error(const char *format, ...) {
+	va_list args;
+	va_start(args, format);
+
+	vprintf(format, args);
+
+    va_end(args);
+    exit(1);
 }

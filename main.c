@@ -10,13 +10,32 @@ int main(int argc, char const *argv[]) {
 	
 	unsigned f_index = get_char_from_constant_list("main");
 	run_binary(f_index);
+
+	ListNode *cs = list_begin(&constants);
+	while(cs != list_end(&constants)) {
+		ConstantPoolRow *con = (ConstantPoolRow*)cs;
+		cs = list_next(cs);
+		list_remove(&con->node);
+		free(con->data);
+		free(con);
+	}
+
+	ListNode *funcs = list_begin(&functions);
+	while(funcs != list_end(&functions)) {
+		Function *func = (Function*)funcs;
+		funcs = list_next(funcs);
+		list_remove(&func->node);
+		ListNode *o = list_begin(&func->code);
+		while(o != list_end(&func->code)) {
+			OP *y = (OP*)o;
+			o = list_next(o);
+			list_remove(&func->node);
+			free(y);
+		}
+		free(func);
+	}
 	
 	return 0;
-}
-
-void runtime_error(const char* data) {
-	printf("%s\n", data);
-	exit(1);
 }
 
 void load_binary() {
@@ -76,7 +95,7 @@ void load_binary() {
 	for(unsigned i = 0; i < constant_count; i++) {
 		unsigned str_len = 0;
 		fread(&str_len, sizeof(unsigned), 1, fp);
-		char *data = malloc(sizeof(char) * str_len);
+		char *data = malloc((sizeof(char) * str_len) + 1);
 		fread(data, sizeof(char), str_len, fp);
 
 		ConstantPoolRow *row = malloc(sizeof(ConstantPoolRow));
@@ -128,8 +147,8 @@ OP *get_op_by_index(List *code, unsigned index) {
 		}
 		n++;
 	}
-	printf("index out of range\n");
-	exit(1);
+	runtime_error("Unable to get op from index");
+	return NULL;
 }
 
 void run_binary(int index) {
@@ -172,13 +191,13 @@ void run_binary(int index) {
 			case BC_STORE: {
 				StackRow *pop = (StackRow*)list_remove(list_back(&stack));
 				
-				char *var_name = get_from_constant_list(left);
+				char *name = get_from_constant_list(left);
 
-				VarList *var = varobject_from_stackobject(pop, var_name);
-				list_insert(list_end(&varlist), var);
-				printf("store %s\n", var_name);
+				VarList *var = varobject_from_stackobject(pop, name);
+				put_var(&varlist, var);
+				printf("store %s\n", name);
 				
-				free(pop);
+				free_stack(pop);
 			}
 			break;
 			case BC_LOAD: {
@@ -206,9 +225,10 @@ void run_binary(int index) {
 				char *concat = malloc(sizeof(char) * (strlen(pop->data_string) + strlen(pop->data_string) + 1));
 				strcpy(concat, pop->data_string);
 				strcat(concat, back->data_string);
+				free(back->data_string);
 				back->data_string = concat;
 				printf("strconcat\n");
-				free(pop);
+				free_stack(pop);
 			}
 			break;
 			case BC_ADD: {
@@ -216,7 +236,7 @@ void run_binary(int index) {
 				StackRow *back = (StackRow*)list_back(&stack);
 				back->data_number += pop->data_number;
 
-				free(pop);
+				free_stack(pop);
 				printf("add\n");
 			}
 			break;
@@ -225,7 +245,7 @@ void run_binary(int index) {
 				StackRow *back = (StackRow*)list_back(&stack);
 				back->data_number -= pop->data_number;
 
-				free(pop);
+				free_stack(pop);
 				printf("sub\n");
 			}
 			break;
@@ -234,7 +254,7 @@ void run_binary(int index) {
 				StackRow *back = (StackRow*)list_back(&stack);
 				back->data_number *= pop->data_number;
 
-				free(pop);
+				free_stack(pop);
 				printf("mul\n");
 			}
 			break;
@@ -243,63 +263,121 @@ void run_binary(int index) {
 				StackRow *back = (StackRow*)list_back(&stack);
 				back->data_number /= pop->data_number;
 
-				free(pop);
+				free_stack(pop);
 				printf("div\n");
+			}
+			break;
+			case BC_CMPGT: {
+				StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
+				StackRow *pop2  = (StackRow*)list_remove(list_back(&stack));
+				if(pop->type == DATA_NUMBER && pop2->type == DATA_NUMBER) {
+					if(pop->data_number > pop2->data_number) {
+						StackRow *result = new_number_stack_object(1);
+						list_insert(list_end(&stack), result);
+					} else {
+						StackRow *result = new_number_stack_object(0);
+						list_insert(list_end(&stack), result);
+					}
+				} else {
+					runtime_error("comparison in cmpgt requires 2 number data type");
+				}
+				free_stack(pop);
+				free_stack(pop2);
+				printf("cmpgt\n");
+			}
+			break;
+			case BC_CMPLT: {
+				StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
+				StackRow *pop2  = (StackRow*)list_remove(list_back(&stack));
+				if(pop->type == DATA_NUMBER && pop2->type == DATA_NUMBER) {
+					if(pop->data_number < pop2->data_number) {
+						StackRow *result = new_number_stack_object(1);
+						list_insert(list_end(&stack), result);
+					} else {
+						StackRow *result = new_number_stack_object(0);
+						list_insert(list_end(&stack), result);
+					}
+				} else {
+					runtime_error("comparison in cmpgt requires 2 number data type");
+				}
+				free_stack(pop);
+				free_stack(pop2);
+				printf("cmplt\n");
+			}
+			break;
+			case BC_JMPIFEQ: {
+				StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
+				StackRow *pop2  = (StackRow*)list_remove(list_back(&stack));
+				if(pop->type == DATA_NUMBER && pop2->type == DATA_NUMBER) {
+					if(pop->data_number == pop2->data_number) {
+						i = (ListNode*)get_op_by_index(&function->code, left-1);
+					}
+				} else {
+					runtime_error("comparison in cmpgt requires 2 number data type");
+				}
+				free_stack(pop);
+				free_stack(pop2);
+				printf("jmpifeq\n");
 			}
 			break;
 			case BC_RET: {
 				StackRow *pop = (StackRow*)list_remove(list_back(&stack));
 				list_insert(list_end(&transfer), pop);
 				printf("ret\n");
-				return;
+				goto release;
 			}
 			break;
 			case BC_GOTO: {
-				i = get_op_by_index(&function->code, left-1);
+				i = (ListNode*)get_op_by_index(&function->code, left-1);
 				printf("goto\n");
 			}
 			break;
 			case BC_CALL: {
 				char *name = get_from_constant_list(left);
 				printf("call\n");
-				if(strcmp(name, "printf") == 0) {
-					StackRow *count  = (StackRow*)list_remove(list_back(&stack));
-					StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
-					if(pop->type == DATA_STRING) {
-						printf("--print %s\n", pop->data_string);
-					} else {
-						printf("--print %i\n", pop->data_number);
-					}
-				} else if(strcmp(name, "dbgstack") == 0) {
-					for(ListNode *i = list_begin(&stack); i != list_end(&stack); i = list_next(i)) {
-						StackRow *row = (StackRow*)i;
-						printf("----------\n");
-						printf("data_int %i\n", row->data_number);
-						printf("----------\n");
-					}
-				} else if(strcmp(name, "dbgvars") == 0) {
-					for(ListNode *i = list_begin(&varlist); i != list_end(&varlist); i = list_next(i)) {
-						VarList *row = (VarList*)i;
-						printf("----------\n");
-						printf("%s data_int %i\n", row->name, row->data_number);
-						printf("----------\n");
-					}
-				} else {
+				if(name) {
 					StackRow *count = (StackRow*)list_remove(list_back(&stack));
-					if(count && count->type != DATA_NUMBER) {
-						printf("Opps, unable to figure number of args to pass to stack\n");
-					}
-					for(int i = 0; i < count->data_number; i++) {
-						StackRow *pop = (StackRow*)list_remove(list_back(&stack));
-						list_insert(list_end(&transfer), pop);
-					}
+					if(strcmp(name, "printf") == 0) {
+						StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
+						if(pop->type == DATA_STRING) {
+							printf("--print %s\n", pop->data_string);
+						} else {
+							printf("--print %i\n", pop->data_number);
+						}
+						free_stack(pop);
+					} else if(strcmp(name, "dbgstack") == 0) {
+						for(ListNode *f = list_begin(&stack); f != list_end(&stack); f = list_next(f)) {
+							StackRow *row = (StackRow*)i;
+							printf("----------\n");
+							printf("data_int %i\n", row->data_number);
+							printf("----------\n");
+						}
+					} else if(strcmp(name, "dbgvars") == 0) {
+						for(ListNode *g = list_begin(&varlist); g != list_end(&varlist); g = list_next(g)) {
+							VarList *row = (VarList*)g;
+							printf("----------\n");
+							printf("%s data_int %i\n", row->name, row->data_number);
+							printf("----------\n");
+						}
+					} else {
+						if(count && count->type != DATA_NUMBER) {
+							printf("Opps, unable to figure number of args to pass to stack\n");
+						}
+						for(int s = 0; s < count->data_number; s++) {
+							StackRow *pop = (StackRow*)list_remove(list_back(&stack));
+							list_insert(list_end(&transfer), pop);
+						}
 
-					run_binary(left);
+						run_binary(left);
 
-					if(list_size(&transfer) > 0) {
-						StackRow *ret = (StackRow*)list_remove(list_back(&transfer));
-						list_insert(list_end(&stack), ret);
+						if(list_size(&transfer) > 0) {
+							StackRow *ret = (StackRow*)list_remove(list_back(&transfer));
+							list_insert(list_end(&stack), ret);
+						}
 					}
+					free_stack(count);
+				} else {
+					printf("UNable to call\n");
 				}
 
 			}
@@ -307,5 +385,24 @@ void run_binary(int index) {
 		}
 		i = list_next(i);
 	}
+
+	release:;
+
+	ListNode *va = list_begin(&varlist);
+	while(va != list_end(&varlist)) {
+		VarList *var = (VarList*)va;
+		va = list_next(va);
+		list_remove(&var->node);
+		free_var(var);
+	}
+	ListNode *st = list_begin(&stack);
+	while(st != list_end(&stack)) {
+		StackRow *sta = (StackRow*)st;
+		st = list_next(st);
+		list_remove(&sta->node);
+		free_stack(sta);
+	}
+
+	
 }
 

@@ -22,7 +22,6 @@ VarList *varobject_from_stackobject(StackRow *stackrow, char *name) {
 }
 
 StackRow *stackobject_from_varobject(VarList *varobj) {
-	StackRow *row = malloc(sizeof(StackRow));
 	switch(varobj->type) {
 		case DATA_STRING: {
 			StackRow *obj = new_string_stack_object(varobj->data_string);

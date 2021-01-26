@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include "list.h"
 #include "datatypes.h"
+#include "utils.h"
 
 typedef struct _StackRow {
 	ListNode node;
@@ -14,5 +15,6 @@ typedef struct _StackRow {
 
 StackRow *new_number_stack_object(int number);
 StackRow *new_string_stack_object(char *data);
+void free_stack(StackRow *stack);
 
 #endif

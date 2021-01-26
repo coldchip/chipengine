@@ -23,6 +23,9 @@ typedef enum {
 	BC_DIV,
 	BC_CALL,
 	BC_RET,
+	BC_CMPGT,
+	BC_CMPLT,
+	BC_JMPIFEQ,
 	BC_GOTO
 } ByteCode;
 
@@ -45,15 +48,11 @@ typedef struct _OP {
 	int right;
 } OP;
 
-char *strmalloc (const char *s) {
-  size_t len = strlen (s) + 1;
-  void *new = malloc (len);
-  if (new == NULL)
-    return NULL;
-  return (char *) memcpy (new, s, len);
-}
-
 void load_binary();
-void run_binary();
+char *get_from_constant_list(int in);
+int get_char_from_constant_list(char *data);
+Function *get_function(unsigned index);
+OP *get_op_by_index(List *code, unsigned index);
+void run_binary(int index);
 
 #endif

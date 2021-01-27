@@ -6,6 +6,11 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdarg.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
 #include "list.h"
 #include "datatypes.h"
 #include "stack.h"
@@ -24,6 +29,8 @@ typedef enum {
 	BC_DIV,
 	BC_CALL,
 	BC_RET,
+	BC_CMPEQ,
+	BC_CMPNEQ,
 	BC_CMPGT,
 	BC_CMPLT,
 	BC_JMPIFEQ,

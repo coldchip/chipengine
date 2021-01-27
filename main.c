@@ -230,19 +230,23 @@ void run_binary(int index) {
 				// mem issue
 				StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
 				StackRow *back = (StackRow*)list_back(&stack);
-				char *concat = malloc(sizeof(char) * (strlen(pop->data_string) + strlen(pop->data_string) + 1));
-				strcpy(concat, pop->data_string);
-				strcat(concat, back->data_string);
-				free(back->data_string);
-				back->data_string = concat;
-				debug_log("strconcat\n");
-				free_stack(pop);
+				if(pop->type == DATA_STRING && back->type == DATA_STRING) {
+					char *concat = malloc(sizeof(char) * (strlen(pop->data_string) + strlen(back->data_string) + 1));
+					strcpy(concat, pop->data_string);
+					strcat(concat, back->data_string);
+					free(back->data_string);
+					back->data_string = concat;
+					debug_log("strconcat\n");
+					free_stack(pop);
+				} else {
+					runtime_error("concat requires 2 string type");
+				}
 			}
 			break;
 			case BC_ADD: {
 				StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
 				StackRow *back = (StackRow*)list_back(&stack);
-				back->data_number += pop->data_number;
+				back->data_number = pop->data_number + back->data_number;
 
 				free_stack(pop);
 				debug_log("add\n");
@@ -251,7 +255,7 @@ void run_binary(int index) {
 			case BC_SUB: {
 				StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
 				StackRow *back = (StackRow*)list_back(&stack);
-				back->data_number -= pop->data_number;
+				back->data_number = pop->data_number - back->data_number;
 
 				free_stack(pop);
 				debug_log("sub\n");
@@ -260,7 +264,7 @@ void run_binary(int index) {
 			case BC_MUL: {
 				StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
 				StackRow *back = (StackRow*)list_back(&stack);
-				back->data_number *= pop->data_number;
+				back->data_number = pop->data_number * back->data_number;
 
 				free_stack(pop);
 				debug_log("mul\n");
@@ -269,10 +273,48 @@ void run_binary(int index) {
 			case BC_DIV: {
 				StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
 				StackRow *back = (StackRow*)list_back(&stack);
-				back->data_number /= pop->data_number;
+				back->data_number = pop->data_number / back->data_number;
 
 				free_stack(pop);
 				debug_log("div\n");
+			}
+			break;
+			case BC_CMPEQ: {
+				StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
+				StackRow *pop2  = (StackRow*)list_remove(list_back(&stack));
+				if(pop->type == DATA_NUMBER && pop2->type == DATA_NUMBER) {
+					if(pop->data_number == pop2->data_number) {
+						StackRow *result = new_number_stack_object(1);
+						list_insert(list_end(&stack), result);
+					} else {
+						StackRow *result = new_number_stack_object(0);
+						list_insert(list_end(&stack), result);
+					}
+				} else {
+					runtime_error("comparison in cmpgt requires 2 number data type");
+				}
+				free_stack(pop);
+				free_stack(pop2);
+				debug_log("cmpgt\n");
+			}
+			break;
+			case BC_CMPNEQ: {
+				StackRow *pop  = (StackRow*)list_remove(list_back(&stack));
+				StackRow *pop2  = (StackRow*)list_remove(list_back(&stack));
+				if(pop->type == DATA_NUMBER && pop2->type == DATA_NUMBER) {
+					if(pop->data_number != pop2->data_number) {
+						StackRow *result = new_number_stack_object(1);
+						list_insert(list_end(&stack), result);
+					} else {
+						StackRow *result = new_number_stack_object(0);
+						list_insert(list_end(&stack), result);
+					}
+				} else {
+					runtime_error("comparison in cmpgt requires 2 number data type");
+				}
+				free_stack(pop);
+				free_stack(pop2);
+				debug_log("cmpgt\n");
 			}
 			break;
 			case BC_CMPGT: {
@@ -381,14 +423,87 @@ void run_binary(int index) {
 						StackRow *index = (StackRow*)list_remove(list_back(&stack));
 						StackRow *str = (StackRow*)list_remove(list_back(&stack));
 						if(str->type == DATA_STRING && index->type == DATA_NUMBER) {
-							char strat[2];
-							strat[1] = '\0';
-							strat[0] = *(str->data_string + index->data_number);
-							StackRow *res = new_string_stack_object(strat);
+							char strat = *(str->data_string + index->data_number);
+							StackRow *res = new_number_stack_object((int)strat);
 							list_insert(list_end(&transfer), res);
 							goto release;
 						} else {
 							runtime_error("invalid type passed to __callinternal__charat");
+						}
+					} else if(strcmp(name, "__callinternal__new_socket") == 0) {
+						int fd = socket(AF_INET, SOCK_STREAM, 0);
+						if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) {
+
+						}
+						StackRow *res = new_number_stack_object(fd);
+						list_insert(list_end(&transfer), res);
+						goto release;
+					} else if(strcmp(name, "__callinternal__socket_bind") == 0) {
+						StackRow *port = (StackRow*)list_remove(list_back(&stack));
+						StackRow *ip = (StackRow*)list_remove(list_back(&stack));
+						StackRow *fd = (StackRow*)list_remove(list_back(&stack));
+						if(fd->type == DATA_NUMBER && ip->type == DATA_STRING && port->type == DATA_NUMBER) {
+							struct sockaddr_in addr;
+							addr.sin_family = AF_INET; 
+							addr.sin_addr.s_addr = inet_addr(ip->data_string); 
+							addr.sin_port = htons(port->data_number); 
+							if((bind(fd->data_number, (struct sockaddr*)&addr, sizeof(addr))) == 0 && (listen(fd->data_number, 5)) == 0) {
+								StackRow *res = new_number_stack_object(1);
+								list_insert(list_end(&transfer), res);
+							} else {
+								StackRow *res = new_number_stack_object(0);
+								list_insert(list_end(&transfer), res);
+							}
+							goto release;
+						} else {
+							runtime_error("invalid type passed to __callinternal__socket_bind");
+						}
+					} else if(strcmp(name, "__callinternal__socket_accept") == 0) {
+						StackRow *fd = (StackRow*)list_remove(list_back(&stack));
+						if(fd->type == DATA_NUMBER) {
+							struct sockaddr_in addr;
+							int addr_len = sizeof(addr);
+							int client = accept(fd->data_number, (struct sockaddr*)&addr, &addr_len); 
+							StackRow *res = new_number_stack_object(client);
+							list_insert(list_end(&transfer), res);
+							goto release;
+						} else {
+							runtime_error("invalid type passed to __callinternal__socket_bind");
+						}
+					} else if(strcmp(name, "__callinternal__socket_read") == 0) {
+						StackRow *size = (StackRow*)list_remove(list_back(&stack));
+						StackRow *fd = (StackRow*)list_remove(list_back(&stack));
+						if(fd->type == DATA_NUMBER && size->type == DATA_NUMBER) {
+							char buf[size->data_number + 1];
+							int s = read(fd->data_number, buf, sizeof(buf));
+							buf[sizeof(buf)] = '\0';
+							StackRow *res = new_string_stack_object(buf);
+							list_insert(list_end(&transfer), res);
+							goto release;
+						} else {
+							runtime_error("invalid type passed to __callinternal__socket_bind");
+						}
+					} else if(strcmp(name, "__callinternal__socket_write") == 0) {
+						StackRow *data = (StackRow*)list_remove(list_back(&stack));
+						StackRow *fd = (StackRow*)list_remove(list_back(&stack));
+						if(fd->type == DATA_NUMBER && data->type == DATA_STRING) {
+							int s = write(fd->data_number, data->data_string, strlen(data->data_string));
+							StackRow *res = new_number_stack_object(s);
+							list_insert(list_end(&transfer), res);
+							goto release;
+						} else {
+							runtime_error("invalid type passed to __callinternal__socket_bind");
+						}
+					} else if(strcmp(name, "__callinternal__itos") == 0) {
+						StackRow *i = (StackRow*)list_remove(list_back(&stack));
+						if(i->type == DATA_NUMBER) {
+							char buf[33];
+							sprintf(buf, "%i", i->data_number);
+							StackRow *res = new_string_stack_object(buf);
+							list_insert(list_end(&transfer), res);
+							goto release;
+						} else {
+							runtime_error("invalid type passed to __callinternal__itos");
 						}
 					} else {
 						if(count && count->type != DATA_NUMBER) {

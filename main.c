@@ -180,10 +180,10 @@ void run_binary(int index) {
 
 	ListNode *i = list_begin(&function->code);
 	while(i != list_end(&function->code)) {
-		OP *row = (OP*)i;
-		ByteCode op = row->op;
-		int left = row->left;
-		int right = row->right;
+		OP *op_row = (OP*)i;
+		ByteCode op = op_row->op;
+		int left = op_row->left;
+		int right = op_row->right;
 		switch(op) {
 			case BC_PUSH: {
 				StackRow *stack_obj = new_number_stack_object(left);
@@ -396,8 +396,9 @@ void run_binary(int index) {
 						}
 						free_stack(pop);
 					} else if(strcmp(name, "dbgstack") == 0) {
+						printf("-----DBGSTACK-----\n");
 						for(ListNode *f = list_begin(&stack); f != list_end(&stack); f = list_next(f)) {
-							StackRow *row = (StackRow*)i;
+							StackRow *row = (StackRow*)f;
 							printf("----------\n");
 							printf("data_int %i\n", row->data_number);
 							printf("----------\n");
@@ -414,30 +415,28 @@ void run_binary(int index) {
 						if(str->type == DATA_STRING) {
 							int str_len = strlen(str->data_string);
 							StackRow *res = new_number_stack_object(str_len);
-							list_insert(list_end(&transfer), res);
-							goto release;
+							list_insert(list_end(&stack), res);
 						} else {
 							runtime_error("invalid type passed to __callinternal__strlen");
 						}
+						free_stack(str);
 					} else if(strcmp(name, "__callinternal__charat") == 0) {
 						StackRow *index = (StackRow*)list_remove(list_back(&stack));
 						StackRow *str = (StackRow*)list_remove(list_back(&stack));
 						if(str->type == DATA_STRING && index->type == DATA_NUMBER) {
 							char strat = *(str->data_string + index->data_number);
 							StackRow *res = new_number_stack_object((int)strat);
-							list_insert(list_end(&transfer), res);
-							goto release;
+							list_insert(list_end(&stack), res);
 						} else {
 							runtime_error("invalid type passed to __callinternal__charat");
 						}
 					} else if(strcmp(name, "__callinternal__new_socket") == 0) {
 						int fd = socket(AF_INET, SOCK_STREAM, 0);
-						if (setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) {
+						if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) {
 
 						}
 						StackRow *res = new_number_stack_object(fd);
-						list_insert(list_end(&transfer), res);
-						goto release;
+						list_insert(list_end(&stack), res);
 					} else if(strcmp(name, "__callinternal__socket_bind") == 0) {
 						StackRow *port = (StackRow*)list_remove(list_back(&stack));
 						StackRow *ip = (StackRow*)list_remove(list_back(&stack));
@@ -449,15 +448,17 @@ void run_binary(int index) {
 							addr.sin_port = htons(port->data_number); 
 							if((bind(fd->data_number, (struct sockaddr*)&addr, sizeof(addr))) == 0 && (listen(fd->data_number, 5)) == 0) {
 								StackRow *res = new_number_stack_object(1);
-								list_insert(list_end(&transfer), res);
+								list_insert(list_end(&stack), res);
 							} else {
 								StackRow *res = new_number_stack_object(0);
-								list_insert(list_end(&transfer), res);
+								list_insert(list_end(&stack), res);
 							}
-							goto release;
 						} else {
 							runtime_error("invalid type passed to __callinternal__socket_bind");
 						}
+						free_stack(port);
+						free_stack(ip);
+						free_stack(fd);
 					} else if(strcmp(name, "__callinternal__socket_accept") == 0) {
 						StackRow *fd = (StackRow*)list_remove(list_back(&stack));
 						if(fd->type == DATA_NUMBER) {
@@ -465,11 +466,11 @@ void run_binary(int index) {
 							int addr_len = sizeof(addr);
 							int client = accept(fd->data_number, (struct sockaddr*)&addr, &addr_len); 
 							StackRow *res = new_number_stack_object(client);
-							list_insert(list_end(&transfer), res);
-							goto release;
+							list_insert(list_end(&stack), res);
 						} else {
 							runtime_error("invalid type passed to __callinternal__socket_bind");
 						}
+						free_stack(fd);
 					} else if(strcmp(name, "__callinternal__socket_read") == 0) {
 						StackRow *size = (StackRow*)list_remove(list_back(&stack));
 						StackRow *fd = (StackRow*)list_remove(list_back(&stack));
@@ -478,33 +479,35 @@ void run_binary(int index) {
 							int s = read(fd->data_number, buf, sizeof(buf));
 							buf[sizeof(buf)] = '\0';
 							StackRow *res = new_string_stack_object(buf);
-							list_insert(list_end(&transfer), res);
-							goto release;
+							list_insert(list_end(&stack), res);
 						} else {
 							runtime_error("invalid type passed to __callinternal__socket_bind");
 						}
+						free_stack(size);
+						free_stack(fd);
 					} else if(strcmp(name, "__callinternal__socket_write") == 0) {
 						StackRow *data = (StackRow*)list_remove(list_back(&stack));
 						StackRow *fd = (StackRow*)list_remove(list_back(&stack));
 						if(fd->type == DATA_NUMBER && data->type == DATA_STRING) {
 							int s = write(fd->data_number, data->data_string, strlen(data->data_string));
 							StackRow *res = new_number_stack_object(s);
-							list_insert(list_end(&transfer), res);
-							goto release;
+							list_insert(list_end(&stack), res);
 						} else {
 							runtime_error("invalid type passed to __callinternal__socket_bind");
 						}
+						free_stack(data);
+						free_stack(fd);
 					} else if(strcmp(name, "__callinternal__itos") == 0) {
 						StackRow *i = (StackRow*)list_remove(list_back(&stack));
 						if(i->type == DATA_NUMBER) {
 							char buf[33];
 							sprintf(buf, "%i", i->data_number);
 							StackRow *res = new_string_stack_object(buf);
-							list_insert(list_end(&transfer), res);
-							goto release;
+							list_insert(list_end(&stack), res);
 						} else {
 							runtime_error("invalid type passed to __callinternal__itos");
 						}
+						free_stack(i);
 					} else {
 						if(count && count->type != DATA_NUMBER) {
 							runtime_error("Opps, unable to figure number of args to pass to stack\n");

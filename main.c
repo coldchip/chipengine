@@ -185,6 +185,11 @@ void run_binary(int index) {
 		int left = op_row->left;
 		int right = op_row->right;
 		switch(op) {
+			case BC_NEWARRAY: {
+				runtime_error("newarray not supported");
+				debug_log("newarray %i\n", left);
+			}
+			break;
 			case BC_PUSH: {
 				StackRow *stack_obj = new_number_stack_object(left);
 				list_insert(list_end(&stack), stack_obj);
@@ -529,6 +534,10 @@ void run_binary(int index) {
 					runtime_error("Unable get function name from constant list");
 				}
 
+			}
+			break;
+			default: {
+				runtime_error("unknown instruction: %i", op);
 			}
 			break;
 		}

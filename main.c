@@ -186,7 +186,77 @@ void run_binary(int index) {
 		int right = op_row->right;
 		switch(op) {
 			case BC_NEWARRAY: {
-				runtime_error("newarray not supported");
+				StackRow *size = (StackRow*)list_remove(list_back(&stack));
+				if(size->type == DATA_NUMBER) {
+					if(left & DATA_NUMBER) {
+						StackRow *array = new_number_array_stack_object(size->data_number);
+						list_insert(list_end(&stack), array);
+					}
+				} else {
+					runtime_error("newarray requires a length stackobject on stack");
+				}
+				free_stack(size);
+				debug_log("newarray %i\n", left);
+			}
+			break;
+			case BC_ARR_STORE: {
+				StackRow *index = (StackRow*)list_remove(list_back(&stack));
+				StackRow *value = (StackRow*)list_remove(list_back(&stack));
+				if(index->type == DATA_NUMBER) {
+					char *name = get_from_constant_list(left);
+					VarList *var = get_var(&varlist, name);
+					if(var->type & DATA_ARRAY_MASK) {
+						int counter = 0;
+						ListNode *ele = list_begin(&var->data_array);
+						while(ele != list_end(&var->data_array)) {
+							VarList *elem = (StackRow*)ele;
+							if(counter == index->data_number) {
+								elem->data_number = value->data_number;
+								goto s_exit;
+							}
+							counter++;
+							ele = list_next(ele);
+						}
+						runtime_error("array access out of range");
+					} else {
+						runtime_error("storing data inside a non array type isn't allowed");
+					}
+				} else {
+					runtime_error("arr_store requires a index stackobject on stack");
+				}
+				s_exit:;
+				free_stack(index);
+				free_stack(value);
+				debug_log("newarray %i\n", left);
+			}
+			break;
+			case BC_ARR_LOAD: {
+				StackRow *index = (StackRow*)list_remove(list_back(&stack));
+				if(index->type == DATA_NUMBER) {
+					char *name = get_from_constant_list(left);
+					VarList *var = get_var(&varlist, name);
+					if(var->type & DATA_ARRAY_MASK) {
+						int counter = 0;
+						ListNode *ele = list_begin(&var->data_array);
+						while(ele != list_end(&var->data_array)) {
+							VarList *elem = (StackRow*)ele;
+							if(counter == index->data_number) {
+								StackRow *value = new_number_stack_object(elem->data_number);
+								list_insert(list_end(&stack), value);
+								goto exit;
+							}
+							counter++;
+							ele = list_next(ele);
+						}
+						runtime_error("array access out of range");
+					} else {
+						runtime_error("loading data inside a non array type isn't allowed");
+					}
+				} else {
+					runtime_error("arr_load requires a index stackobject on stack");
+				}
+				exit:;
+				free_stack(index);
 				debug_log("newarray %i\n", left);
 			}
 			break;

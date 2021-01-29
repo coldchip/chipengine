@@ -12,9 +12,11 @@ typedef struct _VarList {
 	char *name;
 	int data_number;
 	char *data_string;
+	List data_array;
 } VarList;
 
 VarList *new_number_var_object(int number, char *name);
+VarList *new_number_array_var_object(int size, char *name);
 VarList *new_string_var_object(char *data, char *name);
 VarList *get_var(List *list, char *name);
 void put_var(List *varlist, VarList *var);

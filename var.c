@@ -1,31 +1,23 @@
 #include "var.h"
 
-VarList *new_number_var_object(int number, char *name) {
+VarList *new_var(void *data, DataType type, char *name) {
 	VarList *row = malloc(sizeof(VarList));
+	row->data = data;
+	row->type = type;
 	row->name = strmalloc(name);
-	row->type = DATA_NUMBER;
-	row->data_number = number;
 	return row;
 }
 
-VarList *new_number_array_var_object(int size, char *name) {
-	VarList *row = malloc(sizeof(VarList));
-	row->name = strmalloc(name);
-	row->type = DATA_NUMBER | DATA_ARRAY_MASK;
-	list_clear(&row->data_array);
-	for(int i = 0; i < size; i++) {
-		VarList *elem = new_number_var_object(0, name);
-		list_insert(list_end(&row->data_array), elem);
-	}
-	return row;
+String *var_get_string(VarList *var) {
+	return (String*)var->data;
 }
 
-VarList *new_string_var_object(char *data, char *name) {
-	VarList *row = malloc(sizeof(VarList));
-	row->name = strmalloc(name);
-	row->type = DATA_STRING;
-	row->data_string = strmalloc(data);
-	return row;
+Number *var_get_number(VarList *var) {
+	return (Number*)var->data;
+}
+
+Array *var_get_array(VarList *var) {
+	return (Array*)var->data;
 }
 
 VarList *get_var(List *list, char *name) {
@@ -48,17 +40,14 @@ void put_var(List *list, VarList *var) {
 }
 
 void free_var(VarList *var) {
-	if(var->type == DATA_STRING) {
-		free(var->data_string);
-	}
-	if(var->type & DATA_ARRAY_MASK) {
-		ListNode *elem = list_begin(&var->data_array);
-		while(elem != list_end(&var->data_array)) {
-			VarList *r = (VarList*)elem;
-			elem = list_next(elem);
-			list_remove(&r->node);
-			free_var(r);
-		}
+	if(var->type == DATA_NUMBER) {
+		free_number(var->data);
+	} else if(var->type == DATA_STRING) {
+		free_string(var->data);
+	} else if(var->type == DATA_ARRAY_MASK) {
+		free_array(var->data);
+	} else {
+		runtime_error("unable to free unknown type\n");
 	}
 	free(var->name);
 	free(var);

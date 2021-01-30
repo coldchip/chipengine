@@ -5,18 +5,19 @@
 #include "list.h"
 #include "datatypes.h"
 #include "utils.h"
+#include "string.h"
+#include "number.h"
+#include "array.h"
 
 typedef struct _StackRow {
 	ListNode node;
 	DataType type;
-	int data_number;
-	char *data_string;
-	List data_array;
+	void *data;
 } StackRow;
 
-StackRow *new_number_stack_object(int number);
-StackRow *new_number_array_stack_object(int size);
-StackRow *new_string_stack_object(char *data);
+StackRow *new_stack(void *data, DataType type);
+String *stack_get_string(StackRow *stack);
+Number *stack_get_number(StackRow *stack);
 void free_stack(StackRow *stack);
 
 #endif

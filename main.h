@@ -60,6 +60,7 @@ typedef struct _OP {
 } OP;
 
 void load_binary();
+void debug_log(const char *format, ...);
 char *get_from_constant_list(int in);
 int get_char_from_constant_list(char *data);
 Function *get_function(unsigned index);

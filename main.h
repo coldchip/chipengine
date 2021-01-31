@@ -16,6 +16,7 @@
 #include "stack.h"
 #include "conversion.h"
 #include "var.h"
+#include "sb.h"
 
 typedef enum {
 	BC_PUSHSTR,

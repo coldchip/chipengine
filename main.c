@@ -39,27 +39,25 @@ int main(int argc, char const *argv[]) {
 }
 
 void load_binary() {
-	FILE *fp = fopen("/home/ryan/compiler/data/out.bin", "rb");
-	if(fp == NULL) {
-		debug_log("Unable to load\n");
-		exit(1);
-	}
+	extern char _binary_bin_out_bin_start[];
+	extern char _binary_bin_out_bin_end[];
+
+	char *start = _binary_bin_out_bin_start;
+	char *end = _binary_bin_out_bin_end;
 
 	list_clear(&constants);
 	list_clear(&functions);
 	list_clear(&transfer);
 
-	char sig[8];
-	fread(sig, sizeof(char), 8, fp);
+	start += 8;
 
-	unsigned f_count = 0;
-	fread(&f_count, sizeof(unsigned), 1, fp);
+	unsigned f_count = *(unsigned*)(start);
+	start += sizeof(unsigned);
 	for(int i = 0; i < f_count; i++) {
-		unsigned f_index = 0;
-		unsigned code_count = 0;
-
-		fread(&f_index, sizeof(unsigned), 1, fp);
-		fread(&code_count, sizeof(unsigned), 1, fp);
+		unsigned f_index = *(unsigned*)(start);
+		start += sizeof(unsigned);
+		unsigned code_count = *(unsigned*)(start);
+		start += sizeof(unsigned);
 
 		debug_log("Code Count: %i\n", code_count);
 		debug_log("---------------\n");
@@ -69,12 +67,12 @@ void load_binary() {
 		function->index = f_index;
 
 		for(unsigned i = 0; i < code_count; i++) {
-			ByteCode op;
-			int left;
-			int right;
-			fread(&op, sizeof(uint8_t), 1, fp);
-			fread(&left, sizeof(int), 1, fp);
-			fread(&right, sizeof(int), 1, fp);
+			ByteCode op = *(uint8_t*)(start);
+			start += sizeof(uint8_t);
+			int left = *(int*)(start);
+			start += sizeof(int);
+			int right = *(int*)(start);
+			start += sizeof(int);
 			
 
 			OP *row = malloc(sizeof(OP));
@@ -88,15 +86,17 @@ void load_binary() {
 		list_insert(list_end(&functions), function);
 	}
 	debug_log("\n\n");
-	unsigned constant_count = 0;
-	fread(&constant_count, sizeof(unsigned), 1, fp);
+	unsigned constant_count = *(unsigned*)(start);
+	start += sizeof(unsigned);
 	debug_log("Constant Count: %i\n", constant_count);
 	debug_log("---------------\n");
 	for(unsigned i = 0; i < constant_count; i++) {
-		unsigned str_len = 0;
-		fread(&str_len, sizeof(unsigned), 1, fp);
+		unsigned str_len = *(unsigned*)(start);
+		start += sizeof(unsigned);
+
 		char *data = malloc((sizeof(char) * str_len) + 1);
-		fread(data, sizeof(char), str_len, fp);
+		memcpy(data, start, str_len);
+		start += str_len;
 
 		ConstantPoolRow *row = malloc(sizeof(ConstantPoolRow));
 		row->index = i;
@@ -104,15 +104,13 @@ void load_binary() {
 		list_insert(list_end(&constants), row);
 		debug_log("Index: %i, Data: %s\n", i, data);
 	}
-	
-	fclose(fp);
 }
 
 void debug_log(const char *format, ...) {
 	va_list args;
 	va_start(args, format);
 
-	if(1 == 2) {
+	if(1 == 12) {
 		vprintf(format, args);
 	}
 
@@ -180,10 +178,10 @@ void run_binary(int index) {
 
 	ListNode *i = list_begin(&function->code);
 	while(i != list_end(&function->code)) {
-		OP *op_row = (OP*)i;
+		OP *op_row  = (OP*)i;
 		ByteCode op = op_row->op;
-		int left = op_row->left;
-		int right = op_row->right;
+		int left    = op_row->left;
+		int right   = op_row->right;
 		switch(op) {
 			case BC_NEWARRAY: {
 				StackRow *size = (StackRow*)list_remove(list_back(&stack));
@@ -191,9 +189,14 @@ void run_binary(int index) {
 					if(left == DATA_NUMBER) {
 						StackRow *array = new_stack(new_array(stack_get_number(size)->value, left), DATA_ARRAY_MASK);
 						list_insert(list_end(&stack), array);
+					} else if(left == DATA_STRING) {
+						StackRow *array = new_stack(new_array(stack_get_number(size)->value, left), DATA_ARRAY_MASK);
+						list_insert(list_end(&stack), array);
+					} else {
+						runtime_error("unable to create unknown type newarray\n");
 					}
 				} else {
-					runtime_error("newarray requires a length stackobject on stack");
+					runtime_error("newarray requires a length stackobject on stack\n");
 				}
 				free_stack(size);
 				debug_log("newarray %i\n", left);
@@ -562,16 +565,53 @@ void run_binary(int index) {
 						}
 						free_stack(fd);
 					} else if(strcmp(name, "__callinternal__itos") == 0) {
-						StackRow *i = (StackRow*)list_remove(list_back(&stack));
-						if(i->type == DATA_NUMBER) {
+						StackRow *num = (StackRow*)list_remove(list_back(&stack));
+						if(num->type == DATA_NUMBER) {
 							char buf[33];
-							sprintf(buf, "%i", stack_get_number(i)->value);
+							sprintf(buf, "%i", stack_get_number(num)->value);
 							StackRow *stack_obj = new_stack(new_string(buf), DATA_STRING);
 							list_insert(list_end(&stack), stack_obj);
 						} else {
 							runtime_error("invalid type passed to __callinternal__itos");
 						}
-						free_stack(i);
+						free_stack(num);
+					} else if(strcmp(name, "__callinternal__rand") == 0) {
+						StackRow *min = (StackRow*)list_remove(list_back(&stack));
+						StackRow *max = (StackRow*)list_remove(list_back(&stack));
+						if(min->type == DATA_NUMBER && max->type == DATA_NUMBER) {
+							int randnum = stack_get_number(min)->value + rand() / (RAND_MAX / (stack_get_number(max)->value - stack_get_number(min)->value + 1) + 1);
+							StackRow *stack_obj = new_stack(new_number(randnum), DATA_NUMBER);
+							list_insert(list_end(&stack), stack_obj);
+						} else {
+							runtime_error("invalid type passed to __callinternal__itos");
+						}
+						free_stack(min);
+						free_stack(max);
+					} else if(strcmp(name, "__callinternal__exec") == 0) {
+						StackRow *cmd = (StackRow*)list_remove(list_back(&stack));
+						if(cmd->type == DATA_STRING) {
+							FILE *fp = popen(stack_get_string(cmd)->data, "r");
+
+							if(!fp) {
+								runtime_error("unable to run command");
+							}
+							StringBuilder *sb = sb_create();
+							char buffer[128];
+							while(fgets(buffer, sizeof(buffer), fp) > 0) {
+								sb_append(sb, buffer);
+							}
+							pclose(fp);
+							char *res = sb_concat(sb);
+							sb_free(sb);
+
+							StackRow *stack_obj = new_stack(new_string(res), DATA_STRING);
+							list_insert(list_end(&stack), stack_obj);
+
+							free(res);
+						} else {
+							runtime_error("invalid type passed to __callinternal__itos");
+						}
+						free_stack(cmd);
 					} else {
 						if(count && count->type != DATA_NUMBER) {
 							runtime_error("Opps, unable to figure number of args to pass to stack\n");

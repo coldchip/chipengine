@@ -1,4 +1,8 @@
 #!/bin/sh
+
+cp /home/ryan/compiler/data/out.bin bin/out.bin
+ld -r -b binary -o bin/chipcode_program.o bin/out.bin
+
 rep='.o'
 
 for d in ./*.c; do

@@ -4,6 +4,8 @@ List constants;
 List functions;
 List transfer;
 
+FILE *beta = NULL;
+
 int main(int argc, char const *argv[]) {
 	/* code */
 	load_binary();
@@ -106,6 +108,12 @@ void load_binary() {
 	}
 }
 
+int is_regular_file(const char *path){
+	struct stat path_stat;
+	stat(path, &path_stat);
+	return S_ISREG(path_stat.st_mode);
+}
+
 void debug_log(const char *format, ...) {
 	va_list args;
 	va_start(args, format);
@@ -186,15 +194,8 @@ void run_binary(int index) {
 			case BC_NEWARRAY: {
 				StackRow *size = (StackRow*)list_remove(list_back(&stack));
 				if(size->type == DATA_NUMBER) {
-					if(left == DATA_NUMBER) {
-						StackRow *array = new_stack(new_array(stack_get_number(size)->value, left), DATA_ARRAY_MASK);
-						list_insert(list_end(&stack), array);
-					} else if(left == DATA_STRING) {
-						StackRow *array = new_stack(new_array(stack_get_number(size)->value, left), DATA_ARRAY_MASK);
-						list_insert(list_end(&stack), array);
-					} else {
-						runtime_error("unable to create unknown type newarray\n");
-					}
+					StackRow *array = new_stack(new_array(stack_get_number(size)->value, left), DATA_ARRAY_MASK);
+					list_insert(list_end(&stack), array);
 				} else {
 					runtime_error("newarray requires a length stackobject on stack\n");
 				}
@@ -583,10 +584,48 @@ void run_binary(int index) {
 							StackRow *stack_obj = new_stack(new_number(randnum), DATA_NUMBER);
 							list_insert(list_end(&stack), stack_obj);
 						} else {
-							runtime_error("invalid type passed to __callinternal__itos");
+							runtime_error("invalid type passed to __callinternal__rand");
 						}
 						free_stack(min);
 						free_stack(max);
+					} else if(strcmp(name, "__callinternal__sizeof") == 0) {
+						StackRow *arr = (StackRow*)list_remove(list_back(&stack));
+						if(arr->type == DATA_ARRAY_MASK) {
+							int size = stack_get_array(arr)->size;
+							StackRow *stack_obj = new_stack(new_number(size), DATA_NUMBER);
+							list_insert(list_end(&stack), stack_obj);
+						} else {
+							runtime_error("invalid type passed to __callinternal__sizeof");
+						}
+						free_stack(arr);
+					} else if(strcmp(name, "__callinternal__char_to_str_cast") == 0) {
+						StackRow *num = (StackRow*)list_remove(list_back(&stack));
+						if(num->type == DATA_CHAR) {
+							char data[2];
+							data[1] = '\0';
+							data[0] = stack_get_char(num)->value;
+							StackRow *stack_obj = new_stack(new_string(data), DATA_STRING);
+							list_insert(list_end(&stack), stack_obj);
+						} else if(num->type == DATA_NUMBER) {
+							char data[2];
+							data[1] = '\0';
+							data[0] = (char)stack_get_number(num)->value;
+							StackRow *stack_obj = new_stack(new_string(data), DATA_STRING);
+							list_insert(list_end(&stack), stack_obj);
+						} else {
+							runtime_error("invalid type passed to __callinternal__char_to_str_cast");
+						}
+						free_stack(num);
+					} else if(strcmp(name, "__callinternal__char_to_int_cast") == 0) {
+						StackRow *num = (StackRow*)list_remove(list_back(&stack));
+						if(num->type == DATA_CHAR) {
+							int c = stack_get_char(num)->value;
+							StackRow *stack_obj = new_stack(new_number(c), DATA_NUMBER);
+							list_insert(list_end(&stack), stack_obj);
+						} else {
+							runtime_error("invalid type passed to __callinternal__char_to_int_cast");
+						}
+						free_stack(num);
 					} else if(strcmp(name, "__callinternal__exec") == 0) {
 						StackRow *cmd = (StackRow*)list_remove(list_back(&stack));
 						if(cmd->type == DATA_STRING) {
@@ -612,6 +651,51 @@ void run_binary(int index) {
 							runtime_error("invalid type passed to __callinternal__itos");
 						}
 						free_stack(cmd);
+					} else if(strcmp(name, "__callinternal__fopen") == 0) {
+						StackRow *mode = (StackRow*)list_remove(list_back(&stack));
+						StackRow *file = (StackRow*)list_remove(list_back(&stack));
+						if(file->type == DATA_STRING && mode->type == DATA_STRING) {
+							if(is_regular_file(stack_get_string(file)->data)) {
+								beta = fopen(stack_get_string(file)->data, stack_get_string(mode)->data);
+								if(!beta) {
+									StackRow *stack_obj = new_stack(new_number(0), DATA_NUMBER);
+									list_insert(list_end(&stack), stack_obj);
+								} else {
+									StackRow *stack_obj = new_stack(new_number(1), DATA_NUMBER);
+									list_insert(list_end(&stack), stack_obj);
+								}
+							} else {
+								StackRow *stack_obj = new_stack(new_number(0), DATA_NUMBER);
+								list_insert(list_end(&stack), stack_obj);
+							}
+						} else {
+							runtime_error("invalid type passed to __callinternal__fopen");
+						}
+						free_stack(mode);
+						free_stack(file);
+					} else if(strcmp(name, "__callinternal__fread") == 0) {
+						StackRow *size = (StackRow*)list_remove(list_back(&stack));
+						StackRow *fp = (StackRow*)list_remove(list_back(&stack));
+						if(fp->type == DATA_NUMBER && size->type == DATA_NUMBER) {
+							char data[stack_get_number(size)->value + 1];
+							data[sizeof(data) - 1] = '\0';
+							int r = fread(data, sizeof(char), stack_get_number(size)->value, beta);
+							data[r] = '\0';
+							StackRow *stack_obj = new_stack(new_string(data), DATA_STRING);
+							list_insert(list_end(&stack), stack_obj);
+							
+						} else {
+							runtime_error("invalid type passed to __callinternal__fopen");
+						}
+						free_stack(fp);
+					} else if(strcmp(name, "__callinternal__fclose") == 0) {
+						StackRow *fp = (StackRow*)list_remove(list_back(&stack));
+						if(fp->type == DATA_NUMBER) {
+							fclose(beta);
+						} else {
+							runtime_error("invalid type passed to __callinternal__fopen");
+						}
+						free_stack(fp);
 					} else {
 						if(count && count->type != DATA_NUMBER) {
 							runtime_error("Opps, unable to figure number of args to pass to stack\n");

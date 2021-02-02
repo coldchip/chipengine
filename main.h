@@ -7,6 +7,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <netinet/in.h>

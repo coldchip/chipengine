@@ -12,6 +12,9 @@ Array *new_array(int size, DataType type) {
 		} else if(type == DATA_STRING) {
 			String *string = new_string("");
 			arr->data[i] = string;
+		} else if(type == DATA_CHAR) {
+			Char *c = new_char(0);
+			arr->data[i] = c;
 		} else {
 			runtime_error("unable to create array with unknown type");
 		}
@@ -29,6 +32,8 @@ Array *clone_array(Array *old) {
 			new->data[i] = clone_number(old->data[i]);
 		} else if(old->type == DATA_STRING) {
 			new->data[i] = clone_string(old->data[i]);
+		} else if(old->type == DATA_CHAR) {
+			new->data[i] = clone_char(old->data[i]);
 		} else if(old->type == DATA_ARRAY_MASK) {
 			new->data[i] = clone_array(old->data[i]);
 		} else {
@@ -43,6 +48,8 @@ void put_array(Array *array, int index, void *data) {
 		free_number(array->data[index]);
 	} else if(array->type == DATA_STRING) {
 		free_string(array->data[index]);
+	} else if(array->type == DATA_CHAR) {
+		free_char(array->data[index]);
 	} else if(array->type == DATA_ARRAY_MASK) {
 		free_array(array->data[index]);
 	} else {
@@ -53,6 +60,8 @@ void put_array(Array *array, int index, void *data) {
 		array->data[index] = clone_number(data);
 	} else if(array->type == DATA_STRING) {
 		array->data[index] = clone_string(data);
+	} else if(array->type == DATA_CHAR) {
+		array->data[index] = clone_char(data);
 	} else if(array->type == DATA_ARRAY_MASK) {
 		array->data[index] = clone_array(data);
 	} else {
@@ -65,6 +74,8 @@ void *get_array(Array *array, int index) {
 		return clone_number(array->data[index]);
 	} else if(array->type == DATA_STRING) {
 		return clone_string(array->data[index]);
+	} else if(array->type == DATA_CHAR) {
+		return clone_char(array->data[index]);
 	} else if(array->type == DATA_ARRAY_MASK) {
 		return clone_array(array->data[index]);
 	} else {
@@ -78,6 +89,8 @@ void free_array(Array *array) {
 			free_number(array->data[i]);
 		} else if(array->type == DATA_STRING) {
 			free_string(array->data[i]);
+		} else if(array->type == DATA_CHAR) {
+			free_char(array->data[i]);
 		} else if(array->type == DATA_ARRAY_MASK) {
 			free_array(array->data[i]);
 		} else {

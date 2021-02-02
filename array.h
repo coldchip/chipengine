@@ -5,6 +5,7 @@
 #include "list.h"
 #include "string.h"
 #include "number.h"
+#include "char.h"
 #include "datatypes.h"
 
 typedef struct _Array {

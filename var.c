@@ -16,6 +16,10 @@ Number *var_get_number(VarList *var) {
 	return (Number*)var->data;
 }
 
+Char *var_get_char(VarList *var) {
+	return (Char*)var->data;
+}
+
 Array *var_get_array(VarList *var) {
 	return (Array*)var->data;
 }
@@ -44,10 +48,12 @@ void free_var(VarList *var) {
 		free_number(var->data);
 	} else if(var->type == DATA_STRING) {
 		free_string(var->data);
+	} else if(var->type == DATA_CHAR) {
+		free_char(var->data);
 	} else if(var->type == DATA_ARRAY_MASK) {
 		free_array(var->data);
 	} else {
-		runtime_error("unable to free unknown type\n");
+		runtime_error("var::unable to free unknown type\n");
 	}
 	free(var->name);
 	free(var);

@@ -40,7 +40,7 @@ void put_var(List *list, VarList *var) {
 }
 
 void free_var(VarList *var) {
-	if(var->type == DATA_NUMBER) {
+	if(var->type == DATA_NUMBER || var->type == DATA_CHAR) {
 		free_number(var->data);
 	} else if(var->type == DATA_STRING) {
 		free_string(var->data);

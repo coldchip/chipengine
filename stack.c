@@ -20,7 +20,7 @@ Array *stack_get_array(StackRow *stack) {
 }
 
 void free_stack(StackRow *stack) {
-	if(stack->type == DATA_NUMBER) {
+	if(stack->type == DATA_NUMBER || stack->type == DATA_CHAR) {
 		free_number(stack->data);
 	} else if(stack->type == DATA_STRING) {
 		free_string(stack->data);

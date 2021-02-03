@@ -464,11 +464,11 @@ void run_binary(int index) {
 					if(strcmp(name, "printf") == 0) {
 						StackRow *pop = (StackRow*)list_remove(list_back(&stack));
 						if(pop->type == DATA_NUMBER) {
-							printf("%i\n", stack_get_number(pop)->value);
+							printf("%i", stack_get_number(pop)->value);
 						} else if(pop->type == DATA_STRING) {
-							printf("%s\n", stack_get_string(pop)->data);
+							printf("%s", stack_get_string(pop)->data);
 						} else if(pop->type == DATA_CHAR) {
-							printf("%c\n", (char)stack_get_number(pop)->value);
+							printf("%c", (char)stack_get_number(pop)->value);
 						} else {
 							runtime_error("unable to print unsupported type\n");
 						}
@@ -509,6 +509,8 @@ void run_binary(int index) {
 						} else {
 							runtime_error("invalid type passed to __callinternal__charat");
 						}
+						free_stack(index);
+						free_stack(str);
 					} else if(strcmp(name, "__callinternal__new_socket") == 0) {
 						int fd = socket(AF_INET, SOCK_STREAM, 0);
 						if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) {
@@ -554,11 +556,17 @@ void run_binary(int index) {
 						StackRow *size = (StackRow*)list_remove(list_back(&stack));
 						StackRow *fd = (StackRow*)list_remove(list_back(&stack));
 						if(fd->type == DATA_NUMBER && size->type == DATA_NUMBER) {
-							char buf[stack_get_number(size)->value + 1];
-							int s = read(stack_get_number(fd)->value, buf, sizeof(buf));
-							buf[s] = '\0';
+							char buf[stack_get_number(size)->value];
+							int size = read(stack_get_number(fd)->value, buf, sizeof(buf));
 
-							StackRow *stack_obj = new_stack(new_string(buf), DATA_STRING);
+							Array *arr = new_array(size, DATA_CHAR);
+							for(int i = 0; i < size; i++) {
+								Number *t = new_number((int)buf[i]);
+								put_array(arr, i, t);
+								free_number(t);
+							}
+
+							StackRow *stack_obj = new_stack(arr, DATA_ARRAY_MASK);
 							list_insert(list_end(&stack), stack_obj);
 						} else {
 							runtime_error("invalid type passed to __callinternal__socket_bind");
@@ -568,8 +576,15 @@ void run_binary(int index) {
 					} else if(strcmp(name, "__callinternal__socket_write") == 0) {
 						StackRow *data = (StackRow*)list_remove(list_back(&stack));
 						StackRow *fd = (StackRow*)list_remove(list_back(&stack));
-						if(fd->type == DATA_NUMBER && data->type == DATA_STRING) {
-							int s = write(stack_get_number(fd)->value, stack_get_string(data)->data, strlen(stack_get_string(data)->data));
+						if(fd->type == DATA_NUMBER && data->type == DATA_ARRAY_MASK) {
+							Array *data_arr = stack_get_array(data);
+							char result[data_arr->size];
+							for(int i = 0; i < sizeof(result); i++) {
+								Number *t = (Number*)get_array(data_arr, i);
+								result[i] = (char)t->value;
+								free_number(t);
+							}
+							int s = write(stack_get_number(fd)->value, result, sizeof(result));
 							
 							StackRow *stack_obj = new_stack(new_number(s), DATA_NUMBER);
 							list_insert(list_end(&stack), stack_obj);
@@ -698,17 +713,23 @@ void run_binary(int index) {
 						StackRow *size = (StackRow*)list_remove(list_back(&stack));
 						StackRow *fp = (StackRow*)list_remove(list_back(&stack));
 						if(fp->type == DATA_NUMBER && size->type == DATA_NUMBER) {
-							char data[stack_get_number(size)->value + 1];
-							data[sizeof(data) - 1] = '\0';
-							int r = fread(data, sizeof(char), stack_get_number(size)->value, beta);
-							data[r] = '\0';
-							StackRow *stack_obj = new_stack(new_string(data), DATA_STRING);
+							char buf[stack_get_number(size)->value];
+							int r = fread(buf, sizeof(char), stack_get_number(size)->value, beta);
+
+							Array *arr = new_array(r, DATA_CHAR);
+							for(int i = 0; i < r; i++) {
+								Number *t = new_number((int)buf[i]);
+								put_array(arr, i, t);
+								free_number(t);
+							}
+
+							StackRow *stack_obj = new_stack(arr, DATA_ARRAY_MASK);
 							list_insert(list_end(&stack), stack_obj);
-							
 						} else {
 							runtime_error("invalid type passed to __callinternal__fopen");
 						}
 						free_stack(fp);
+						free_stack(size);
 					} else if(strcmp(name, "__callinternal__fclose") == 0) {
 						StackRow *fp = (StackRow*)list_remove(list_back(&stack));
 						if(fp->type == DATA_NUMBER) {

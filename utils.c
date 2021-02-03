@@ -2,11 +2,10 @@
 
 char *strmalloc(char *s) {
 	size_t len = strlen(s) + 1;
-	char *new_s = malloc(len);
-	if(new_s == NULL) {
-		runtime_error("Malloc error");
-	}
-	memcpy(new_s, s, len);
+	char *new_s = malloc(len * sizeof(char));
+	
+	memset(new_s, 0, len);
+	strcpy(new_s, s);
 	return new_s;
 }
 

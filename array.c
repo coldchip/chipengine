@@ -6,15 +6,12 @@ Array *new_array(int size, DataType type) {
 	arr->data = (void**)malloc(sizeof(void**) * size);
 	arr->size = size;
 	for(int i = 0; i < size; i++) {
-		if(type == DATA_NUMBER) {
+		if(type == DATA_NUMBER || type == DATA_CHAR) {
 			Number *number = new_number(0);
 			arr->data[i] = number;
 		} else if(type == DATA_STRING) {
 			String *string = new_string("");
 			arr->data[i] = string;
-		} else if(type == DATA_CHAR) {
-			Number *c = new_number(0);
-			arr->data[i] = c;
 		} else {
 			runtime_error("unable to create array with unknown type");
 		}
@@ -28,7 +25,7 @@ Array *clone_array(Array *old) {
 	new->data = (void**)malloc(sizeof(void**) * old->size);
 	new->size = old->size;
 	for(int i = 0; i < old->size; i++) {
-		if(old->type == DATA_NUMBER) {
+		if(old->type == DATA_NUMBER || old->type == DATA_CHAR) {
 			new->data[i] = clone_number(old->data[i]);
 		} else if(old->type == DATA_STRING) {
 			new->data[i] = clone_string(old->data[i]);
@@ -42,7 +39,7 @@ Array *clone_array(Array *old) {
 }
 
 void put_array(Array *array, int index, void *data) {
-	if(array->type == DATA_NUMBER) {
+	if(array->type == DATA_NUMBER || array->type == DATA_CHAR) {
 		free_number(array->data[index]);
 	} else if(array->type == DATA_STRING) {
 		free_string(array->data[index]);
@@ -52,7 +49,7 @@ void put_array(Array *array, int index, void *data) {
 		runtime_error("unable to free array element, unknown type\n");
 	}
 
-	if(array->type == DATA_NUMBER) {
+	if(array->type == DATA_NUMBER || array->type == DATA_CHAR) {
 		array->data[index] = clone_number(data);
 	} else if(array->type == DATA_STRING) {
 		array->data[index] = clone_string(data);
@@ -64,7 +61,7 @@ void put_array(Array *array, int index, void *data) {
 }
 
 void *get_array(Array *array, int index) {
-	if(array->type == DATA_NUMBER) {
+	if(array->type == DATA_NUMBER || array->type == DATA_CHAR) {
 		return clone_number(array->data[index]);
 	} else if(array->type == DATA_STRING) {
 		return clone_string(array->data[index]);
@@ -78,7 +75,7 @@ void *get_array(Array *array, int index) {
 
 void free_array(Array *array) {
 	for(int i = 0; i < array->size; i++) {
-		if(array->type == DATA_NUMBER) {
+		if(array->type == DATA_NUMBER || array->type == DATA_CHAR) {
 			free_number(array->data[i]);
 		} else if(array->type == DATA_STRING) {
 			free_string(array->data[i]);

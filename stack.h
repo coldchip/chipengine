@@ -18,7 +18,6 @@ typedef struct _StackRow {
 StackRow *new_stack(void *data, DataType type);
 String *stack_get_string(StackRow *stack);
 Number *stack_get_number(StackRow *stack);
-Char *stack_get_char(StackRow *stack);
 Array *stack_get_array(StackRow *stack);
 void free_stack(StackRow *stack);
 

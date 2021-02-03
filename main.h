@@ -20,11 +20,11 @@
 #include "sb.h"
 
 typedef enum {
-	BC_PUSHSTR,
 	BC_STRCONCAT,
 	BC_STORE,
 	BC_LOAD,
-	BC_PUSH,
+	BC_PUSH_I, // number
+	BC_PUSH_S, // string
 	BC_ADD,
 	BC_SUB,
 	BC_MUL,

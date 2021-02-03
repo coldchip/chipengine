@@ -15,10 +15,6 @@ Number *stack_get_number(StackRow *stack) {
 	return (Number*)stack->data;
 }
 
-Char *stack_get_char(StackRow *stack) {
-	return (Char*)stack->data;
-}
-
 Array *stack_get_array(StackRow *stack) {
 	return (Array*)stack->data;
 }
@@ -28,8 +24,6 @@ void free_stack(StackRow *stack) {
 		free_number(stack->data);
 	} else if(stack->type == DATA_STRING) {
 		free_string(stack->data);
-	} else if(stack->type == DATA_CHAR) {
-		free_char(stack->data);
 	} else if(stack->type == DATA_ARRAY_MASK) {
 		free_array(stack->data);
 	} else {

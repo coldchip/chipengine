@@ -19,7 +19,6 @@ typedef struct _VarList {
 VarList *new_var(void *data, DataType type, char *name);
 String *var_get_string(VarList *var);
 Number *var_get_number(VarList *var);
-Char *var_get_char(VarList *var);
 Array *var_get_array(VarList *var);
 VarList *get_var(List *list, char *name);
 void put_var(List *varlist, VarList *var);

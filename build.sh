@@ -1,7 +1,7 @@
 #!/bin/sh
 
-cp /home/ryan/compiler/data/out.bin bin/out.bin
-ld -r -b binary -o bin/chipcode_program.o bin/out.bin
+cp /home/ryan/compiler/data/out.chip bin/out.chip
+ld -r -b binary -o bin/chipcode_program.o bin/out.chip
 
 rep='.o'
 

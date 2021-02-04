@@ -41,17 +41,26 @@ int main(int argc, char const *argv[]) {
 }
 
 void load_binary() {
-	extern char _binary_bin_out_bin_start[];
+	extern char _binary_bin_out_chip_start[];
 	// extern char _binary_bin_out_bin_end[];
 
-	char *start = _binary_bin_out_bin_start;
+	char *start = _binary_bin_out_chip_start;
 	// char *end = _binary_bin_out_bin_end;
 
 	list_clear(&constants);
 	list_clear(&functions);
 	list_clear(&transfer);
 
-	start += 8;
+	Header *header = (Header*)start;
+	if(header->magic != 1178944383) {
+		runtime_error("unable to read binary, invalid magic number\n");
+	}
+
+	if(header->version != 2) {
+		runtime_error("unable to run binary, invalid version\n");
+	}
+
+	start += sizeof(Header);
 
 	unsigned f_count = *(unsigned*)(start);
 	start += sizeof(unsigned);
@@ -61,7 +70,7 @@ void load_binary() {
 		unsigned code_count = *(unsigned*)(start);
 		start += sizeof(unsigned);
 
-		debug_log("Code Count: %i\n", code_count);
+		debug_log("F %i Code Count: %i\n", f_index, code_count);
 		debug_log("---------------\n");
 
 		Function *function = malloc(sizeof(Function));
@@ -115,14 +124,15 @@ int is_regular_file(const char *path){
 }
 
 void debug_log(const char *format, ...) {
-	va_list args;
-	va_start(args, format);
-
 	if(1 == 12) {
-		vprintf(format, args);
-	}
+		va_list args;
+		va_start(args, format);
 
-    va_end(args);
+		vprintf(format, args);
+		
+
+	    va_end(args);
+	}
 }
 
 char *get_from_constant_list(int in) {
@@ -176,8 +186,9 @@ void run_binary(int index) {
 
 	List stack;
 	list_clear(&stack);
-	List varlist;
-	list_clear(&varlist);
+
+	VarList *varlist[VARSIZE];
+	memset(varlist, 0, sizeof(varlist));
 
 	while(list_size(&transfer) > 0) {
 		StackRow *pop = (StackRow*)list_remove(list_back(&transfer));
@@ -208,8 +219,7 @@ void run_binary(int index) {
 				StackRow *index = (StackRow*)list_remove(list_back(&stack));
 				StackRow *value = (StackRow*)list_remove(list_back(&stack));
 				if(index->type == DATA_NUMBER) {
-					char *name = get_from_constant_list(left);
-					VarList *var = get_var(&varlist, name);
+					VarList *var = varlist[left];
 					if(var->type == DATA_ARRAY_MASK) {
 						Array *array = var_get_array(var);
 						put_array(array, stack_get_number(index)->value, value->data);
@@ -227,8 +237,7 @@ void run_binary(int index) {
 			case BC_ARR_LOAD: {
 				StackRow *index = (StackRow*)list_remove(list_back(&stack));
 				if(index->type == DATA_NUMBER) {
-					char *name = get_from_constant_list(left);
-					VarList *var = get_var(&varlist, name);
+					VarList *var = varlist[left];
 					if(var->type == DATA_ARRAY_MASK) {
 						Array *array = var_get_array(var);
 						void *da = get_array(array, stack_get_number(index)->value);
@@ -261,21 +270,19 @@ void run_binary(int index) {
 			break;
 			case BC_STORE: {
 				StackRow *pop = (StackRow*)list_remove(list_back(&stack));
-				char *name = get_from_constant_list(left);
-
-				VarList *var = varobject_from_stackobject(pop, name);
-				put_var(&varlist, var);
-				debug_log("store %s\n", name);
+				
+				if(varlist[left]) {
+					free_var(varlist[left]);	
+				}
+				VarList *var = varobject_from_stackobject(pop, "");
+				varlist[left] = var;
+				debug_log("store %i\n", left);
 				
 				free_stack(pop);
 			}
 			break;
 			case BC_LOAD: {
-				char *name = get_from_constant_list(left);
-				if(!name) {
-					runtime_error("Load failed\n");
-				}
-				VarList *var = get_var(&varlist, name);
+				VarList *var = varlist[left];
 				if(!var) {
 					runtime_error("Load var failed\n");
 				}
@@ -461,7 +468,7 @@ void run_binary(int index) {
 				debug_log("call %s\n", name);
 				if(name) {
 					StackRow *count = (StackRow*)list_remove(list_back(&stack));
-					if(strcmp(name, "printf") == 0) {
+					if(strcmp(name, "__callinternal__printf") == 0) {
 						StackRow *pop = (StackRow*)list_remove(list_back(&stack));
 						if(pop->type == DATA_NUMBER) {
 							printf("%i", stack_get_number(pop)->value);
@@ -473,7 +480,7 @@ void run_binary(int index) {
 							runtime_error("unable to print unsupported type\n");
 						}
 						free_stack(pop);
-					} else if(strcmp(name, "dbgstack") == 0) {
+					} else if(strcmp(name, "__callinternal__printf") == 0) {
 						printf("-----DBGSTACK-----\n");
 						for(ListNode *f = list_begin(&stack); f != list_end(&stack); f = list_next(f)) {
 							StackRow *row = (StackRow*)f;
@@ -481,9 +488,9 @@ void run_binary(int index) {
 							printf("data_int %i\n", stack_get_number(row)->value);
 							printf("----------\n");
 						}
-					} else if(strcmp(name, "dbgvars") == 0) {
-						for(ListNode *g = list_begin(&varlist); g != list_end(&varlist); g = list_next(g)) {
-							VarList *row = (VarList*)g;
+					} else if(strcmp(name, "__callinternal__printf") == 0) {
+						for(int i = 0; i < VARSIZE; i++) {
+							VarList *row = varlist[i];
 							printf("----------\n");
 							printf("%s data_int %i\n", row->name, var_get_number(row)->value);
 							printf("----------\n");
@@ -739,6 +746,8 @@ void run_binary(int index) {
 						}
 						free_stack(fp);
 					} else {
+						clock_t t; 
+    					t = clock(); 
 						if(count && count->type != DATA_NUMBER) {
 							runtime_error("Opps, unable to figure number of args to pass to stack\n");
 						}
@@ -753,6 +762,10 @@ void run_binary(int index) {
 							StackRow *ret = (StackRow*)list_remove(list_back(&transfer));
 							list_insert(list_end(&stack), ret);
 						}
+						t = clock() - t; 
+					    double time_taken = ((double)t)/CLOCKS_PER_SEC; // in seconds 
+					  
+					    //printf("\n%s took %f seconds to execute \n", get_from_constant_list(left), time_taken); 
 					}
 					free_stack(count);
 				} else {
@@ -771,12 +784,10 @@ void run_binary(int index) {
 
 	release:;
 
-	ListNode *va = list_begin(&varlist);
-	while(va != list_end(&varlist)) {
-		VarList *var = (VarList*)va;
-		va = list_next(va);
-		list_remove(&var->node);
-		free_var(var);
+	for(int h = 0; h < VARSIZE; h++) {
+		if(varlist[h]) {
+			free_var(varlist[h]);
+		}
 	}
 	ListNode *st = list_begin(&stack);
 	while(st != list_end(&stack)) {

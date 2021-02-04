@@ -20,25 +20,6 @@ Array *var_get_array(VarList *var) {
 	return (Array*)var->data;
 }
 
-VarList *get_var(List *list, char *name) {
-	for(ListNode *i = list_begin(list); i != list_end(list); i = list_next(i)) {
-		VarList *row = (VarList*)i;
-		if(strcmp(row->name, name) == 0) {
-			return row;
-		}
-	}
-	return NULL;
-}
-
-void put_var(List *list, VarList *var) {
-	VarList *is_var = get_var(list, var->name);
-	if(is_var != NULL) {
-		list_remove(&is_var->node);
-		free_var(is_var);
-	}
-	list_insert(list_end(list), var);
-}
-
 void free_var(VarList *var) {
 	if(var->type == DATA_NUMBER || var->type == DATA_CHAR) {
 		free_number(var->data);

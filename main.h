@@ -12,12 +12,22 @@
 #include <sys/types.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <time.h> 
 #include "list.h"
 #include "datatypes.h"
 #include "stack.h"
 #include "conversion.h"
 #include "var.h"
 #include "sb.h"
+
+#define STACK_SIZE 4000000
+#define VARSIZE 65535
+
+typedef struct _Header {
+	int magic;
+	int version;
+	uint64_t time;
+} Header;
 
 typedef enum {
 	BC_STRCONCAT,

@@ -4,7 +4,7 @@
 #include "stack.h"
 #include "var.h"
 
-VarList *varobject_from_stackobject(StackRow *stackrow, char *name);
+VarList *varobject_from_stackobject(StackRow *stackrow, int id);
 StackRow *stackobject_from_varobject(VarList *varobj);
 
 #endif

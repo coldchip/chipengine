@@ -1,10 +1,10 @@
 #include "var.h"
 
-VarList *new_var(void *data, DataType type, char *name) {
+VarList *new_var(void *data, DataType type, int id) {
 	VarList *row = malloc(sizeof(VarList));
 	row->data = data;
 	row->type = type;
-	row->name = strmalloc(name);
+	row->id = id;
 	return row;
 }
 
@@ -20,6 +20,20 @@ Array *var_get_array(VarList *var) {
 	return (Array*)var->data;
 }
 
+void var_move(VarList *var, VarList *new) {
+	if(var->type == DATA_NUMBER || var->type == DATA_CHAR) {
+		free_number(var->data);
+	} else if(var->type == DATA_STRING) {
+		free_string(var->data);
+	} else if(var->type == DATA_ARRAY_MASK) {
+		free_array(var->data);
+	} else {
+		runtime_error("var::unable to free unknown type\n");
+	}
+	var->data = new->data;
+	free(new);
+}
+
 void free_var(VarList *var) {
 	if(var->type == DATA_NUMBER || var->type == DATA_CHAR) {
 		free_number(var->data);
@@ -30,6 +44,5 @@ void free_var(VarList *var) {
 	} else {
 		runtime_error("var::unable to free unknown type\n");
 	}
-	free(var->name);
 	free(var);
 }

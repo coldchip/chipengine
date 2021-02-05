@@ -1,13 +1,13 @@
 #include "conversion.h"
 
 // Converts a stack object to a variable
-VarList *varobject_from_stackobject(StackRow *stack, char *name) {
+VarList *varobject_from_stackobject(StackRow *stack, int id) {
 	if(stack->type == DATA_STRING) {
-		return new_var(clone_string(stack->data), DATA_STRING, name);
+		return new_var(clone_string(stack->data), DATA_STRING, id);
 	} else if(stack->type == DATA_NUMBER || stack->type == DATA_CHAR) {
-		return new_var(clone_number(stack->data), DATA_NUMBER, name);
+		return new_var(clone_number(stack->data), DATA_NUMBER, id);
 	} else if(stack->type == DATA_ARRAY_MASK) {
-		return new_var(clone_array(stack->data), DATA_ARRAY_MASK, name);
+		return new_var(clone_array(stack->data), DATA_ARRAY_MASK, id);
 	} else {
 		runtime_error("unknown type to convert\n");
 	}

@@ -12,14 +12,15 @@
 typedef struct _VarList {
 	ListNode node;
 	DataType type;
-	char *name;
+	int id;
 	void *data;
 } VarList;
 
-VarList *new_var(void *data, DataType type, char *name);
+VarList *new_var(void *data, DataType type, int id);
 String *var_get_string(VarList *var);
 Number *var_get_number(VarList *var);
 Array *var_get_array(VarList *var);
+void var_move(VarList *var, VarList *new);
 void free_var(VarList *var);
 
 #endif

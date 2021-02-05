@@ -12,14 +12,6 @@ String *clone_string(String *old) {
 	return new;
 }
 
-void concat_string(String *string, char *a, char *b) {
-	char *new = malloc(strlen(a) + strlen(b) + 1);
-	strcpy(new, a);
-	strcat(new, b);
-	free(string->data);
-	string->data = new;
-}
-
 void free_string(String *string) {
 	free(string->data);
 	free(string);

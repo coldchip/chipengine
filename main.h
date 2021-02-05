@@ -20,8 +20,8 @@
 #include "var.h"
 #include "sb.h"
 
-#define STACK_SIZE 4000000
-#define VARSIZE 65535
+#define VARSIZE 102400
+#define STACKSIZE 256
 
 typedef struct _Header {
 	int magic;
@@ -58,18 +58,18 @@ typedef struct _ConstantPoolRow {
 	char *data;
 } ConstantPoolRow;
 
-typedef struct _Function {
-	ListNode node;
-	unsigned index;
-	List code;
-} Function;
-
 typedef struct _OP {
-	ListNode node;
 	ByteCode op;
 	int left;
 	int right;
 } OP;
+
+typedef struct _Function {
+	ListNode node;
+	unsigned index;
+	int code_count;
+	OP *code;
+} Function;
 
 void load_binary();
 void debug_log(const char *format, ...);

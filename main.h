@@ -18,7 +18,6 @@
 #include "stack.h"
 #include "sb.h"
 
-#define VARSIZE 102400
 #define STACKSIZE 256
 
 typedef struct _Header {
@@ -79,6 +78,6 @@ char *get_from_constant_list(int in);
 int get_char_from_constant_list(char *data);
 Function *get_function(unsigned index);
 OP *get_op_by_index(List *code, unsigned index);
-void run_binary(int index);
+void run_binary(int index, int scopeid);
 
 #endif

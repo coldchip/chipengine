@@ -21,11 +21,14 @@ typedef struct _StackRow {
 	int data_number;
 	char *data_string;
 	struct _StackRow **data_array;
+	struct _StackRow *owner;
+	int scope;
 } StackRow;
 
-StackRow *new_stack_number(int data);
-StackRow *new_stack_string(char *data);
-StackRow *new_stack_array(DataType type, int size);
+StackRow *new_stack();
+StackRow *new_stack_number(int data, int scope);
+StackRow *new_stack_string(char *data, int scope);
+StackRow *new_stack_array(DataType type, int size, int scope);
 int stack_get_number(StackRow *stack);
 char *stack_get_string(StackRow *stack);
 StackRow *stack_get_array(StackRow *stack, int i);

@@ -4,16 +4,17 @@ List constants;
 List functions;
 
 int transfer_size = 0;
-StackRow *transfer[1024];
+StackRow *transfer[128];
 
 FILE *beta = NULL;
 
 int main(int argc, char const *argv[]) {
 	/* code */
+	setbuf(stdout, 0);
 	load_binary();
 	
 	unsigned f_index = get_char_from_constant_list("main");
-	run_binary(f_index);
+	run_binary(f_index, 0);
 
 	ListNode *cs = list_begin(&constants);
 	while(cs != list_end(&constants)) {
@@ -192,11 +193,13 @@ void put_var(List *list, StackRow *var, int id) {
 	
 }
 
-void run_binary(int index) {
+void run_binary(int index, int scopeid) {
 	Function *function = get_function(index);
 	if(!function) {
 		runtime_error("Function %i not found\n", index);
 	}
+
+	StackRow *preserve = NULL;
 
 	int sp = 0;
 
@@ -220,7 +223,7 @@ void run_binary(int index) {
 			case BC_NEWARRAY: {
 				StackRow *size = stack[--sp];
 				if(size->type == DATA_NUMBER) {
-					stack[sp++] = new_stack_array(left, stack_get_number(size));
+					stack[sp++] = new_stack_array(left, stack_get_number(size), scopeid);
 				} else {
 					runtime_error("newarray requires a length stackobject on stack\n");
 				}
@@ -269,14 +272,14 @@ void run_binary(int index) {
 			break;
 			case BC_PUSH_I: {
 				// push type number
-				stack[sp++] = new_stack_number(left);
+				stack[sp++] = new_stack_number(left, scopeid);
 				debug_log("push_i %i\n", left);
 			}
 			break;
 			case BC_PUSH_S: {
 				// push type string
 				char *string = get_from_constant_list(left);
-				stack[sp++] = new_stack_string(string);
+				stack[sp++] = new_stack_string(string, scopeid);
 				debug_log("push_s %s\n", string);
 			}
 			break;
@@ -310,7 +313,7 @@ void run_binary(int index) {
 					strcpy(buf, stack_get_string(first));
 					strcat(buf, stack_get_string(last));
 
-					stack[sp++] = new_stack_string(buf);
+					stack[sp++] = new_stack_string(buf, scopeid);
 				} else if(first->type == DATA_STRING && last->type == DATA_NUMBER) {
 					// string + char
 					char buf[strlen(stack_get_string(first)) + 1 + 1]; // strlen(string) + sizeof(char) + 1
@@ -319,7 +322,7 @@ void run_binary(int index) {
 					char append = (char)stack_get_number(last);
 					strncat(buf, &append, 1);
 
-					stack[sp++] = new_stack_string(buf);
+					stack[sp++] = new_stack_string(buf, scopeid);
 				} else {
 					runtime_error("concat requires 2 string type\n");
 				}
@@ -331,7 +334,7 @@ void run_binary(int index) {
 			case BC_ADD: {
 				StackRow *pop  = stack[--sp];
 				StackRow *back = stack[--sp];
-				stack[sp++] = new_stack_number(stack_get_number(pop) + stack_get_number(back));
+				stack[sp++] = new_stack_number(stack_get_number(pop) + stack_get_number(back), scopeid);
 
 				free_stack(pop);
 				free_stack(back);
@@ -341,7 +344,7 @@ void run_binary(int index) {
 			case BC_SUB: {
 				StackRow *pop  = stack[--sp];
 				StackRow *back = stack[--sp];
-				stack[sp++] = new_stack_number(stack_get_number(pop) - stack_get_number(back));
+				stack[sp++] = new_stack_number(stack_get_number(pop) - stack_get_number(back), scopeid);
 
 				free_stack(pop);
 				free_stack(back);
@@ -351,7 +354,7 @@ void run_binary(int index) {
 			case BC_MUL: {
 				StackRow *pop  = stack[--sp];
 				StackRow *back = stack[--sp];
-				stack[sp++] = new_stack_number(stack_get_number(pop) * stack_get_number(back));
+				stack[sp++] = new_stack_number(stack_get_number(pop) * stack_get_number(back), scopeid);
 
 				free_stack(pop);
 				free_stack(back);
@@ -361,7 +364,7 @@ void run_binary(int index) {
 			case BC_DIV: {
 				StackRow *pop  = stack[--sp];
 				StackRow *back = stack[--sp];
-				stack[sp++] = new_stack_number(stack_get_number(pop) / stack_get_number(back));
+				stack[sp++] = new_stack_number(stack_get_number(pop) / stack_get_number(back), scopeid);
 
 				free_stack(pop);
 				free_stack(back);
@@ -373,9 +376,9 @@ void run_binary(int index) {
 				StackRow *pop2 = stack[--sp];
 				if(pop->type == DATA_NUMBER && pop2->type == DATA_NUMBER) {
 					if(stack_get_number(pop) == stack_get_number(pop2)) {
-						stack[sp++] = new_stack_number(1);
+						stack[sp++] = new_stack_number(1, scopeid);
 					} else {
-						stack[sp++] = new_stack_number(0);
+						stack[sp++] = new_stack_number(0, scopeid);
 					}
 				} else {
 					runtime_error("comparison in cmpeq requires 2 number data type");
@@ -390,9 +393,9 @@ void run_binary(int index) {
 				StackRow *pop2 = stack[--sp];
 				if(pop->type == DATA_NUMBER && pop2->type == DATA_NUMBER) {
 					if(stack_get_number(pop) != stack_get_number(pop2)) {
-						stack[sp++] = new_stack_number(1);
+						stack[sp++] = new_stack_number(1, scopeid);
 					} else {
-						stack[sp++] = new_stack_number(0);
+						stack[sp++] = new_stack_number(0, scopeid);
 					}
 				} else {
 					runtime_error("comparison in cmpneq requires 2 number data type");
@@ -407,9 +410,9 @@ void run_binary(int index) {
 				StackRow *pop2 = stack[--sp];
 				if(pop->type == DATA_NUMBER && pop2->type == DATA_NUMBER) {
 					if(stack_get_number(pop) > stack_get_number(pop2)) {
-						stack[sp++] = new_stack_number(1);
+						stack[sp++] = new_stack_number(1, scopeid);
 					} else {
-						stack[sp++] = new_stack_number(0);
+						stack[sp++] = new_stack_number(0, scopeid);
 					}
 				} else {
 					runtime_error("comparison in cmpgt requires 2 number data type");
@@ -424,9 +427,9 @@ void run_binary(int index) {
 				StackRow *pop2 = stack[--sp];
 				if(pop->type == DATA_NUMBER && pop2->type == DATA_NUMBER) {
 					if(stack_get_number(pop) < stack_get_number(pop2)) {
-						stack[sp++] = new_stack_number(1);
+						stack[sp++] = new_stack_number(1, scopeid);
 					} else {
-						stack[sp++] = new_stack_number(0);
+						stack[sp++] = new_stack_number(0, scopeid);
 					}
 				} else {
 					runtime_error("comparison in cmplt requires 2 number data type");
@@ -453,6 +456,15 @@ void run_binary(int index) {
 			break;
 			case BC_RET: {
 				StackRow *pop = stack[--sp];
+				if(pop->aspect == DATA_POINTER && pop->scope == scopeid) {
+					// preserve local data
+					StackRow *head = pop;
+					while(pop->aspect == DATA_POINTER) {
+						pop = pop->owner; // loop until we find the owner
+					}
+					preserve = pop;	
+					free_stack(head); // free this since(it's popped) & it's untracked			
+				}
 				transfer[transfer_size++] = pop;
 				debug_log("ret\n");
 				goto release;
@@ -502,7 +514,7 @@ void run_binary(int index) {
 						if(str->type == DATA_STRING) {
 							int str_len = strlen(stack_get_string(str));
 							
-							stack[sp++] = new_stack_number(str_len);
+							stack[sp++] = new_stack_number(str_len, scopeid);
 						} else {
 							runtime_error("invalid type passed to __callinternal__strlen");
 						}
@@ -512,7 +524,7 @@ void run_binary(int index) {
 						StackRow *str = stack[--sp];
 						if(str->type == DATA_STRING && index->type == DATA_NUMBER) {
 							char strat = *(stack_get_string(str) + stack_get_number(index));
-							stack[sp++] = new_stack_number(strat);
+							stack[sp++] = new_stack_number(strat, scopeid);
 						} else {
 							runtime_error("invalid type passed to __callinternal__charat");
 						}
@@ -523,7 +535,7 @@ void run_binary(int index) {
 						if(setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &(int){1}, sizeof(int)) < 0) {
 
 						}
-						stack[sp++] = new_stack_number(fd);
+						stack[sp++] = new_stack_number(fd, scopeid);
 					} else if(strcmp(name, "__callinternal__socket_bind") == 0) {
 						StackRow *port = stack[--sp];
 						StackRow *ip = stack[--sp];
@@ -534,9 +546,9 @@ void run_binary(int index) {
 							addr.sin_addr.s_addr = inet_addr(stack_get_string(ip)); 
 							addr.sin_port = htons(stack_get_number(port)); 
 							if((bind(stack_get_number(fd), (struct sockaddr*)&addr, sizeof(addr))) == 0 && (listen(stack_get_number(fd), 5)) == 0) {
-								stack[sp++] = new_stack_number(1);
+								stack[sp++] = new_stack_number(1, scopeid);
 							} else {
-								stack[sp++] = new_stack_number(0);
+								stack[sp++] = new_stack_number(0, scopeid);
 							}
 						} else {
 							runtime_error("invalid type passed to __callinternal__socket_bind");
@@ -550,7 +562,7 @@ void run_binary(int index) {
 							struct sockaddr_in addr;
 							socklen_t addr_len = sizeof(addr);
 							int client = accept(stack_get_number(fd), (struct sockaddr*)&addr, &addr_len); 
-							stack[sp++] = new_stack_number(client);
+							stack[sp++] = new_stack_number(client, scopeid);
 						} else {
 							runtime_error("invalid type passed to __callinternal__socket_bind");
 						}
@@ -562,9 +574,9 @@ void run_binary(int index) {
 							char buf[stack_get_number(size)];
 							int size = read(stack_get_number(fd), buf, sizeof(buf));
 
-							StackRow *arr = new_stack_array(DATA_CHAR, size);
+							StackRow *arr = new_stack_array(DATA_CHAR, size, scopeid);
 							for(int i = 0; i < size; i++) {
-								StackRow *t = new_stack_number((int)buf[i]);
+								StackRow *t = new_stack_number((int)buf[i], scopeid);
 								stack_put_array(arr, i, t);
 								free_stack(t);
 							}
@@ -587,7 +599,7 @@ void run_binary(int index) {
 							}
 							int s = write(stack_get_number(fd), result, sizeof(result));
 							
-							stack[sp++] = new_stack_number(s);
+							stack[sp++] = new_stack_number(s, scopeid);
 						} else {
 							runtime_error("invalid type passed to __callinternal__socket_bind");
 						}
@@ -606,7 +618,7 @@ void run_binary(int index) {
 						if(num->type == DATA_NUMBER) {
 							char buf[33];
 							sprintf(buf, "%i", stack_get_number(num));
-							stack[sp++] = new_stack_string(buf);
+							stack[sp++] = new_stack_string(buf, scopeid);
 						} else {
 							runtime_error("invalid type passed to __callinternal__itos");
 						}
@@ -616,7 +628,7 @@ void run_binary(int index) {
 						StackRow *max = stack[--sp];
 						if(min->type == DATA_NUMBER && max->type == DATA_NUMBER) {
 							int randnum = stack_get_number(min) + rand() / (RAND_MAX / (stack_get_number(max) - stack_get_number(min) + 1) + 1);
-							stack[sp++] = new_stack_number(randnum);
+							stack[sp++] = new_stack_number(randnum, scopeid);
 						} else {
 							runtime_error("invalid type passed to __callinternal__rand");
 						}
@@ -626,7 +638,7 @@ void run_binary(int index) {
 						StackRow *arr = stack[--sp];
 						if(arr->type == DATA_ARRAY_MASK) {
 							int size = arr->size;
-							stack[sp++] = new_stack_number(size);
+							stack[sp++] = new_stack_number(size, scopeid);
 						} else {
 							runtime_error("invalid type passed to __callinternal__sizeof");
 						}
@@ -637,12 +649,12 @@ void run_binary(int index) {
 							char data[2];
 							data[1] = '\0';
 							data[0] = stack_get_number(num);
-							stack[sp++] = new_stack_string(data);
+							stack[sp++] = new_stack_string(data, scopeid);
 						} else if(num->type == DATA_NUMBER) {
 							char data[2];
 							data[1] = '\0';
 							data[0] = (char)stack_get_number(num);
-							stack[sp++] = new_stack_string(data);
+							stack[sp++] = new_stack_string(data, scopeid);
 						} else {
 							runtime_error("invalid type passed to __callinternal__char_to_str_cast");
 						}
@@ -651,7 +663,7 @@ void run_binary(int index) {
 						StackRow *num = stack[--sp];
 						if(num->type == DATA_CHAR) {
 							int c = stack_get_number(num);
-							stack[sp++] = new_stack_number(c);
+							stack[sp++] = new_stack_number(c, scopeid);
 						} else {
 							runtime_error("invalid type passed to __callinternal__char_to_int_cast");
 						}
@@ -673,7 +685,7 @@ void run_binary(int index) {
 							char *res = sb_concat(sb);
 							sb_free(sb);
 
-							stack[sp++] = new_stack_string(res);
+							stack[sp++] = new_stack_string(res, scopeid);
 
 							free(res);
 						} else {
@@ -687,12 +699,12 @@ void run_binary(int index) {
 							if(is_regular_file(stack_get_string(file))) {
 								beta = fopen(stack_get_string(file), stack_get_string(mode));
 								if(!beta) {
-									stack[sp++] = new_stack_number(0);
+									stack[sp++] = new_stack_number(0, scopeid);
 								} else {
-									stack[sp++] = new_stack_number(1);
+									stack[sp++] = new_stack_number(1, scopeid);
 								}
 							} else {
-								stack[sp++] = new_stack_number(0);
+								stack[sp++] = new_stack_number(0, scopeid);
 							}
 						} else {
 							runtime_error("invalid type passed to __callinternal__fopen");
@@ -706,9 +718,9 @@ void run_binary(int index) {
 							char buf[stack_get_number(size)];
 							int r = fread(buf, sizeof(char), stack_get_number(size), beta);
 
-							StackRow *arr = new_stack_array(DATA_CHAR, r);
+							StackRow *arr = new_stack_array(DATA_CHAR, r, scopeid);
 							for(int i = 0; i < r; i++) {
-								StackRow *t = new_stack_number((int)buf[i]);
+								StackRow *t = new_stack_number((int)buf[i], scopeid);
 								stack_put_array(arr, i, t);
 								free_stack(t);
 							}
@@ -727,9 +739,43 @@ void run_binary(int index) {
 							runtime_error("invalid type passed to __callinternal__fopen");
 						}
 						free_stack(fp);
-					} else {
-						//clock_t begin = clock();
+					} else if(strcmp(name, "__callinternal__array_to_string") == 0) {
+						StackRow *arr = stack[--sp];
+						if(arr->type == DATA_ARRAY_MASK) {
+						
+							char buf[arr->size];
+							for(int i = 0; i < arr->size; i++) {
+								StackRow *elem = stack_get_array(arr, i);
+								buf[i] = stack_get_number(elem);
+								free_stack(elem);
+							}
 
+							stack[sp++] = new_stack_string(buf, scopeid);
+						} else {
+							runtime_error("invalid type passed to __callinternal__fopen");
+						}
+						free_stack(arr);
+					} else if(strcmp(name, "__callinternal__string_to_array") == 0) {
+						StackRow *str = stack[--sp];
+						if(str->type == DATA_STRING) {
+							char *buf = stack_get_string(str);
+							StackRow *arr = new_stack_array(DATA_CHAR, strlen(buf), scopeid);
+							for(int i = 0; i < arr->size; i++) {
+								StackRow *t = new_stack_number((int)buf[i], scopeid);
+								stack_put_array(arr, i, t);
+								free_stack(t);
+							}
+
+							stack[sp++] = arr;
+						} else {
+							runtime_error("invalid type passed to __callinternal__fopen");
+						}
+						free_stack(str);
+					} else {
+						/*
+						clock_t begin = clock();
+						*/
+						
 						if(count && count->type != DATA_NUMBER) {
 							runtime_error("Opps, unable to figure number of args to pass to stack\n");
 						}
@@ -738,19 +784,21 @@ void run_binary(int index) {
 							transfer[transfer_size++] = pop;
 						}
 
-						run_binary(left);
+						run_binary(left, scopeid + 1);
 
 						while(transfer_size > 0) {
 							stack[sp++] = transfer[--transfer_size];
 						}
 
-						//clock_t end = clock();
+						/*
+						clock_t end = clock();
 
-						//double time_elapsed = (double)(end - begin) / CLOCKS_PER_SEC;
+						double time_elapsed = (double)(end - begin) / CLOCKS_PER_SEC;
 
-						//if(time_elapsed > 0.001) {
-					    	//printf("\n%s took %f seconds to execute \n", get_from_constant_list(left), time_elapsed); 
-						//}
+						if(time_elapsed > 0.001) {
+					    	printf("\n%s took %f seconds to execute \n", get_from_constant_list(left), time_elapsed); 
+						}
+						*/
 					}
 					free_stack(count);
 				} else {
@@ -773,13 +821,15 @@ void run_binary(int index) {
 	while(c != list_end(&varlist)) {
 		StackRow *row = (StackRow*)c;
 		c = list_next(c);
-		list_remove(&row->node);
-		free_stack(row);
+		if(row != preserve)
+			free_stack(row);
 
 	}
 
 	for(int h = 0; h < sp; h++) {
-		free_stack(stack[h]);
+		StackRow *row = stack[h];
+		if(row != preserve)
+			free_stack(stack[h]);
 	}
 
 	

@@ -5,20 +5,32 @@
 #include "list.h"
 #include "datatypes.h"
 #include "utils.h"
-#include "string.h"
-#include "number.h"
-#include "array.h"
+
+typedef enum {
+	DATA_ACTUAL,
+	DATA_POINTER
+} DataAspect;
 
 typedef struct _StackRow {
 	ListNode node;
 	DataType type;
-	void *data;
+	DataType array_type;
+	DataAspect aspect;
+	int id;
+	int size;
+	int data_number;
+	char *data_string;
+	struct _StackRow **data_array;
 } StackRow;
 
-StackRow *new_stack(void *data, DataType type);
-String *stack_get_string(StackRow *stack);
-Number *stack_get_number(StackRow *stack);
-Array *stack_get_array(StackRow *stack);
+StackRow *new_stack_number(int data);
+StackRow *new_stack_string(char *data);
+StackRow *new_stack_array(DataType type, int size);
+int stack_get_number(StackRow *stack);
+char *stack_get_string(StackRow *stack);
+StackRow *stack_get_array(StackRow *stack, int i);
+void stack_put_array(StackRow *stack, int i, StackRow *data);
+StackRow *stack_clone(StackRow *stack);
 void free_stack(StackRow *stack);
 
 #endif

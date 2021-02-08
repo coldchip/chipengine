@@ -16,8 +16,6 @@
 #include "list.h"
 #include "datatypes.h"
 #include "stack.h"
-#include "conversion.h"
-#include "var.h"
 #include "sb.h"
 
 #define VARSIZE 102400
@@ -30,15 +28,21 @@ typedef struct _Header {
 } Header;
 
 typedef enum {
-	BC_STRCONCAT,
-	BC_STORE,
-	BC_LOAD,
-	BC_PUSH_I, // number
-	BC_PUSH_S, // string
+	BC_NOP, // do nothing
+	BC_NEWARRAY,
+	BC_ARR_STORE,
+	BC_ARR_LOAD,
 	BC_ADD,
 	BC_SUB,
 	BC_MUL,
 	BC_DIV,
+	BC_SHL,
+	BC_SHR,
+	BC_STRCONCAT,
+	BC_STORE,
+	BC_LOAD,
+	BC_PUSH_I, // for numbers and char
+	BC_PUSH_S, // string
 	BC_CALL,
 	BC_RET,
 	BC_CMPEQ,
@@ -46,11 +50,9 @@ typedef enum {
 	BC_CMPGT,
 	BC_CMPLT,
 	BC_JMPIFEQ,
-	BC_GOTO,
-	BC_NEWARRAY,
-	BC_ARR_STORE,
-	BC_ARR_LOAD
-} ByteCode;
+	BC_GOTO
+} ByteCode; // max 64 bytecodes (00111111) 2 bits used for size
+
 
 typedef struct _ConstantPoolRow {
 	ListNode node;

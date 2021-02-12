@@ -18,7 +18,7 @@
 #include "stack.h"
 #include "sb.h"
 
-#define STACKSIZE 256
+#define STACKSIZE 65535
 
 typedef struct _Header {
 	int magic;
@@ -37,11 +37,12 @@ typedef enum {
 	BC_DIV,
 	BC_SHL,
 	BC_SHR,
+	BC_AND,
 	BC_STRCONCAT,
 	BC_STORE,
 	BC_LOAD,
-	BC_PUSH_I, // for numbers and char
-	BC_PUSH_S, // string
+	BC_PUSH,
+	BC_POP,
 	BC_CALL,
 	BC_RET,
 	BC_CMPEQ,
@@ -49,9 +50,45 @@ typedef enum {
 	BC_CMPGT,
 	BC_CMPLT,
 	BC_JMPIFEQ,
-	BC_GOTO
-} ByteCode; // max 64 bytecodes (00111111) 2 bits used for size
+	BC_GOTO,
+	BC_DEREF,
+	BC_REF,
+	BC_MOV
+} ByteCode;
 
+typedef enum {
+	BM_L = 1 << 7,
+	BM_R = 1 << 3,
+	BM_L_REG = 1 << 6,
+	BM_R_REG = 1 << 2,
+	BM_L_ADDR = 1 << 5,
+	BM_R_ADDR = 1 << 1,
+	BM_L_VAL = 1 << 4,
+	BM_R_VAL = 1 << 0,
+} ByteMode;
+
+typedef enum {
+	REG_0  = 0,
+	REG_1  = 1,
+	REG_2  = 2,
+	REG_3  = 3,
+	REG_4  = 4,
+	REG_5  = 5,
+	REG_6  = 6,
+	REG_7  = 7,
+	REG_8  = 8,
+	REG_9  = 9,
+	REG_10 = 10,
+	REG_11 = 11,
+	REG_12 = 12,
+	REG_13 = 13,
+	REG_14 = 14,
+	REG_15 = 15,
+	SP     = 16, // stack pointer
+	FP     = 17, // frame pointer
+	IP     = 18, // instruction pointer
+	REGSIZE
+} Register;
 
 typedef struct _ConstantPoolRow {
 	ListNode node;
@@ -61,6 +98,7 @@ typedef struct _ConstantPoolRow {
 
 typedef struct _OP {
 	ByteCode op;
+	ByteMode mode;
 	int left;
 	int right;
 } OP;
@@ -78,6 +116,6 @@ char *get_from_constant_list(int in);
 int get_char_from_constant_list(char *data);
 Function *get_function(unsigned index);
 OP *get_op_by_index(List *code, unsigned index);
-void run_binary(int index, int scopeid);
+void run_binary(int index, char *stack, int *reg);
 
 #endif

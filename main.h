@@ -14,8 +14,6 @@
 #include <arpa/inet.h>
 #include <time.h> 
 #include "list.h"
-#include "datatypes.h"
-#include "stack.h"
 #include "sb.h"
 
 #define STACKSIZE 65535
@@ -49,22 +47,29 @@ typedef enum {
 	BC_CMPNEQ,
 	BC_CMPGT,
 	BC_CMPLT,
-	BC_JMPIFEQ,
-	BC_GOTO,
+	BC_JNE,
+	BC_JE,
+	BC_JMP,
 	BC_DEREF,
 	BC_REF,
-	BC_MOV
+	BC_MOV,
+	BC_MOVIND,
+	BC_CMP,
+	BC_SETEGT,
+	BC_SETELT
 } ByteCode;
 
 typedef enum {
-	BM_L = 1 << 7,
-	BM_R = 1 << 3,
-	BM_L_REG = 1 << 6,
-	BM_R_REG = 1 << 2,
-	BM_L_ADDR = 1 << 5,
-	BM_R_ADDR = 1 << 1,
-	BM_L_VAL = 1 << 4,
-	BM_R_VAL = 1 << 0,
+	BM_L = 1 << 0,
+	BM_R = 1 << 1,
+	BM_L_REG = 1 << 2,
+	BM_R_REG = 1 << 3,
+	BM_L_ADDR = 1 << 4,
+	BM_R_ADDR = 1 << 5,
+	BM_L_VAL = 1 << 6,
+	BM_R_VAL = 1 << 7,
+	BM_L_IND = 1 << 8,
+	BM_R_IND = 1 << 9
 } ByteMode;
 
 typedef enum {
@@ -87,6 +92,9 @@ typedef enum {
 	SP     = 16, // stack pointer
 	FP     = 17, // frame pointer
 	IP     = 18, // instruction pointer
+	F_GT   = 19, // flag greater
+	F_EQ   = 20, // flag equal
+	F_LT   = 21, // flag less
 	REGSIZE
 } Register;
 

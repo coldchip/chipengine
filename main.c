@@ -3,11 +3,6 @@
 List constants;
 List functions;
 
-int transfer_size = 0;
-StackRow *transfer[128];
-
-FILE *beta = NULL;
-
 int main(int argc, char const *argv[]) {
 	/* code */
 	setbuf(stdout, 0);
@@ -81,8 +76,8 @@ void load_binary() {
 		function->code_count = code_count;
 
 		for(unsigned i = 0; i < code_count; i++) {
-			ByteMode mode = *(uint8_t*)(start);
-			start += sizeof(uint8_t);
+			ByteMode mode = *(uint16_t*)(start);
+			start += sizeof(uint16_t);
 			ByteCode op = *(uint8_t*)(start);
 			start += sizeof(uint8_t);
 
@@ -181,27 +176,6 @@ Function *get_function(unsigned index) {
 	return NULL;
 }
 
-StackRow *get_var(List *list, int id) {
-	for(ListNode *i = list_begin(list); i != list_end(list); i = list_next(i)) {
-		StackRow *row = (StackRow*)i;
-		if(row->id == id) {
-			return row;
-		}
-	}
-	return NULL;
-}
-
-void put_var(List *list, StackRow *var, int id) {
-	var->id = id;
-	StackRow *exists = get_var(list, id);
-	if(exists) {
-		list_remove(&exists->node);
-		free_stack(exists);
-	}
-	list_insert(list_end(list), var);
-	
-}
-
 void run_binary(int index, char *stack, int *reg) {
 	Function *function = get_function(index);
 	if(!function) {
@@ -209,7 +183,11 @@ void run_binary(int index, char *stack, int *reg) {
 	}
 
 	char *stack_8  = (char*)stack;
+	short *stack_16 = (short*)stack;
 	int  *stack_32 = (int*)stack;
+
+	int ip_save = reg[IP];
+	reg[IP] = 0;
 
 	while(reg[IP] < function->code_count) {
 		OP op_row  = function->code[reg[IP]];
@@ -220,23 +198,23 @@ void run_binary(int index, char *stack, int *reg) {
 		switch(op) {
 			case BC_PUSH: {
 				if(mode & BM_L_REG) {
-					*(stack_32 + reg[SP]) = reg[left];
+					*(int*)(stack_8 + reg[SP]) = reg[left];
 				} else if(mode & BM_L_ADDR) {
-					*(stack_32 + reg[SP]) = *(stack_32 + left);
+					*(int*)(stack_8 + reg[SP]) = *(int*)(stack_8 + left);
 				} else if(mode & BM_L_VAL) {
-					*(stack_32 + reg[SP]) = left;
+					*(int*)(stack_8 + reg[SP]) = left;
 				} else {
 					runtime_error("unknown bytemode access");
 				}
-				reg[SP] += 1;
+				reg[SP] += 4;
 			}
 			break;
 			case BC_POP: {
-				reg[SP] -= 1;
+				reg[SP] -= 4;
 				if(mode & BM_L_REG) {
-					reg[left] = *(stack_32 + reg[SP]);
+					reg[left] = *(int*)(stack_8 + reg[SP]);
 				} else if(mode & BM_L_ADDR) {
-					*(stack_32 + left) = *(stack_32 + reg[SP]);
+					*(int*)(stack_8 + left) = *(int*)(stack_8 + reg[SP]);
 				} else {
 					runtime_error("unknown bytemode access");
 				}
@@ -247,7 +225,7 @@ void run_binary(int index, char *stack, int *reg) {
 				if(mode & BM_R_REG) {
 					carry = reg[right];
 				} else if(mode & BM_R_ADDR) {
-					carry = *(stack_32 + right);
+					carry = *(int*)(reg[FP] + stack_8 + right);
 				} else if(mode & BM_R_VAL) {
 					carry = right;
 				} else {
@@ -257,7 +235,26 @@ void run_binary(int index, char *stack, int *reg) {
 				if(mode & BM_L_REG) {
 					reg[left] = carry;
 				} else if(mode & BM_L_ADDR) {
-					*(stack_32 + left) = carry;
+					*(int*)(reg[FP] + stack_8 + left) = carry;
+				} else {
+					runtime_error("unknown bytemode access");
+				}
+				
+			}
+			break;
+			case BC_MOVIND: {
+				// move indirect
+				int carry;
+				if(mode & BM_R_REG) {
+					carry = *(int*)(stack_8 + reg[right]);
+				} else {
+					runtime_error("unknown bytemode access");
+				}
+
+				if(mode & BM_L_REG) {
+					reg[left] = carry;
+				} else if(mode & BM_L_ADDR) {
+					*(int*)(reg[FP] + stack_8 + left) = carry;
 				} else {
 					runtime_error("unknown bytemode access");
 				}
@@ -296,11 +293,95 @@ void run_binary(int index, char *stack, int *reg) {
 				}				
 			}
 			break;
+			case BC_JMP: {
+				if(mode & BM_L_ADDR) {
+					reg[IP] = left - 1;
+				} else {
+					runtime_error("unknown bytemode access");
+				}				
+			}
+			break;
+			case BC_JNE: {
+				if(mode & BM_L_ADDR) {
+					if(reg[F_EQ] == 0) {
+						reg[IP] = left - 1;
+					}
+				} else {
+					runtime_error("unknown bytemode access");
+				}				
+			}
+			break;
+			case BC_JE: {
+				if(mode & BM_L_ADDR) {
+					if(reg[F_EQ] == 1) {
+						reg[IP] = left - 1;
+					}
+				} else {
+					runtime_error("unknown bytemode access");
+				}				
+			}
+			break;
+			case BC_CMP: {
+				int l;
+				int r;
+				if(mode & BM_R_REG) {
+					r = reg[right];
+				} else if(mode & BM_R_ADDR) {
+					r = *(int*)(reg[FP] + stack_8 + right);
+				} else if(mode & BM_R_VAL) {
+					r = right;
+				} else {
+					runtime_error("unknown bytemode access");
+				}
+
+				if(mode & BM_L_REG) {
+					l = reg[left];
+				} else if(mode & BM_L_ADDR) {
+					l = *(int*)(reg[FP] + stack_8 + left);
+				} else if(mode & BM_L_VAL) {
+					l = left;
+				} else {
+					runtime_error("unknown bytemode access");
+				}
+
+				reg[F_GT] = 0;
+				reg[F_EQ] = 0;
+				reg[F_LT] = 0;
+
+				if(l > r) {
+					reg[F_GT] = 1;
+				} else if(l == r) {
+					reg[F_EQ] = 1;
+				} else if(l < r) {
+					reg[F_LT] = 1;
+				}
+			}
+			break;
+			case BC_SETEGT: {
+				if(mode & BM_L_REG) {
+					reg[left] = reg[F_GT];
+				} else {
+					runtime_error("unknown bytemode access");
+				}				
+			}
+			break;
+			case BC_SETELT: {
+				if(mode & BM_L_REG) {
+					reg[left] = reg[F_LT];
+				} else {
+					runtime_error("unknown bytemode access");
+				}				
+			}
+			break;
 			case BC_CALL: {
 				if(mode & BM_L_ADDR) {
 					char *name = get_from_constant_list(left);
-					printf("call: %s\n", name);
-					run_binary(left, stack, reg);
+					// printf("call: %s\n", name);
+					if(strcmp(name, "dbg") == 0) {
+						printf("%i\n", *(int*)(stack_8 + reg[REG_10]));
+					} else {
+						run_binary(left, stack, reg);
+					}
 				} else {
 					runtime_error("unknown bytemode access");
 				}				
@@ -314,6 +395,10 @@ void run_binary(int index, char *stack, int *reg) {
 		reg[IP]++;
 	}
 
+	reg[IP] = ip_save;
+
+	/*
+
 	printf("-----REGS-----\n");
 
 	for(int i = 0; i < REGSIZE; i++) {
@@ -326,12 +411,14 @@ void run_binary(int index, char *stack, int *reg) {
 
 	printf("-----STACK-----\n");
 
-	for(int i = 0; i < 1024; i++) {
+	for(int i = 0; i < 128; i++) {
 		if(i % 4 == 0 && i != 0) {
 			printf("\n");
 		}
 		printf("%02x", stack[i] & 0xff);
 	}
 	printf("\n");
+
+	*/
 }
 

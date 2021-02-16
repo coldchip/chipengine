@@ -221,7 +221,7 @@ void run_binary(int index, char *stack, int *reg) {
 			}
 			break;
 			case BC_MOV: {
-				int carry;
+				int carry = 0;
 				if(mode & BM_R_REG) {
 					carry = reg[right];
 				} else if(mode & BM_R_ADDR) {
@@ -242,9 +242,27 @@ void run_binary(int index, char *stack, int *reg) {
 				
 			}
 			break;
+			case BC_LEA: {
+				int addr = 0;
+				if(mode & BM_R_ADDR) {
+					addr = right;
+				} else {
+					runtime_error("unknown bytemode access");
+				}
+
+				if(mode & BM_L_REG) {
+					reg[left] = addr;
+				} else if(mode & BM_L_ADDR) {
+					*(int*)(reg[FP] + stack_8 + left) = addr;
+				} else {
+					runtime_error("unknown bytemode access");
+				}
+				
+			}
+			break;
 			case BC_MOVIND: {
 				// move indirect
-				int carry;
+				int carry = 0;
 				if(mode & BM_R_REG) {
 					carry = *(int*)(stack_8 + reg[right]);
 				} else {
@@ -255,6 +273,27 @@ void run_binary(int index, char *stack, int *reg) {
 					reg[left] = carry;
 				} else if(mode & BM_L_ADDR) {
 					*(int*)(reg[FP] + stack_8 + left) = carry;
+				} else {
+					runtime_error("unknown bytemode access");
+				}
+				
+			}
+			break;
+			case BC_MOVIND2: {
+				// move indirect
+				int carry = 0;
+				if(mode & BM_R_REG) {
+					carry = reg[right];
+				} else if(mode & BM_R_ADDR) {
+					carry = *(int*)(reg[FP] + stack_8 + right);
+				} else if(mode & BM_R_VAL) {
+					carry = right;
+				} else {
+					runtime_error("unknown bytemode access");
+				}
+
+				if(mode & BM_L_REG) {
+					*(int*)(stack_8 + reg[left]) = carry;
 				} else {
 					runtime_error("unknown bytemode access");
 				}
@@ -293,6 +332,22 @@ void run_binary(int index, char *stack, int *reg) {
 				}				
 			}
 			break;
+			case BC_MOD: {
+				if(mode & BM_L_REG && mode & BM_R_REG) {
+					reg[left] %= reg[right];
+				} else {
+					runtime_error("unknown bytemode access");
+				}				
+			}
+			break;
+			case BC_AND: {
+				if(mode & BM_L_REG && mode & BM_R_REG) {
+					reg[left] &= reg[right];
+				} else {
+					runtime_error("unknown bytemode access");
+				}				
+			}
+			break;
 			case BC_JMP: {
 				if(mode & BM_L_ADDR) {
 					reg[IP] = left - 1;
@@ -322,8 +377,8 @@ void run_binary(int index, char *stack, int *reg) {
 			}
 			break;
 			case BC_CMP: {
-				int l;
-				int r;
+				int l = 0;
+				int r = 0;
 				if(mode & BM_R_REG) {
 					r = reg[right];
 				} else if(mode & BM_R_ADDR) {
@@ -368,6 +423,22 @@ void run_binary(int index, char *stack, int *reg) {
 			case BC_SETELT: {
 				if(mode & BM_L_REG) {
 					reg[left] = reg[F_LT];
+				} else {
+					runtime_error("unknown bytemode access");
+				}				
+			}
+			break;
+			case BC_SETEEQ: {
+				if(mode & BM_L_REG) {
+					reg[left] = reg[F_EQ];
+				} else {
+					runtime_error("unknown bytemode access");
+				}				
+			}
+			break;
+			case BC_SETENEQ: {
+				if(mode & BM_L_REG) {
+					reg[left] = !reg[F_EQ];
 				} else {
 					runtime_error("unknown bytemode access");
 				}				

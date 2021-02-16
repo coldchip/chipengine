@@ -33,6 +33,7 @@ typedef enum {
 	BC_SUB,
 	BC_MUL,
 	BC_DIV,
+	BC_MOD,
 	BC_SHL,
 	BC_SHR,
 	BC_AND,
@@ -54,9 +55,13 @@ typedef enum {
 	BC_REF,
 	BC_MOV,
 	BC_MOVIND,
+	BC_MOVIND2,
 	BC_CMP,
 	BC_SETEGT,
-	BC_SETELT
+	BC_SETELT,
+	BC_SETEEQ,
+	BC_SETENEQ,
+	BC_LEA
 } ByteCode;
 
 typedef enum {

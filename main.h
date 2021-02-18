@@ -61,7 +61,9 @@ typedef enum {
 	BC_SETELT,
 	BC_SETEEQ,
 	BC_SETENEQ,
-	BC_LEA
+	BC_LEA,
+	BC_SYSCALL,
+	BC_HALT
 } ByteCode;
 
 typedef enum {
@@ -116,19 +118,11 @@ typedef struct _OP {
 	int right;
 } OP;
 
-typedef struct _Function {
-	ListNode node;
-	unsigned index;
-	int code_count;
-	OP *code;
-} Function;
-
 void load_binary();
 void debug_log(const char *format, ...);
 char *get_from_constant_list(int in);
 int get_char_from_constant_list(char *data);
-Function *get_function(unsigned index);
 OP *get_op_by_index(List *code, unsigned index);
-void run_binary(int index, char *stack, int *reg);
+void run_binary(int ip, char *stack, int *reg);
 
 #endif
